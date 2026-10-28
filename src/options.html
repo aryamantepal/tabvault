@@ -4,11 +4,278 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TabVault Settings</title>
-  <link rel="stylesheet" href="options.css">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --card-bg: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #7c3aed;
+      --primary-hover: #6d28d9;
+      --primary-focus: rgba(124, 58, 237, 0.2);
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+      --success-text: #065f46;
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --danger-text: #991b1b;
+      --radius: 8px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --border: #334155;
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --primary: #8b5cf6;
+        --primary-hover: #7c3aed;
+        --primary-focus: rgba(139, 92, 246, 0.3);
+        --success-bg: #064e3b;
+        --success-border: #047857;
+        --success-text: #a7f3d0;
+        --danger-bg: #7f1d1d;
+        --danger-border: #b91c1c;
+        --danger-text: #fecaca;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      padding: 32px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 540px;
+    }
+
+    header {
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .status-banner {
+      display: none;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .status-banner.success {
+      display: block;
+      background-color: var(--success-bg);
+      border: 1px solid var(--success-border);
+      color: var(--success-text);
+    }
+
+    .status-banner.error {
+      display: block;
+      background-color: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      color: var(--danger-text);
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .help-text {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      background-color: var(--card-bg);
+      color: var(--text);
+      border-radius: var(--radius);
+      font-size: 0.9375rem;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-focus);
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 6px 0;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      margin-top: 3px;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .checkbox-label {
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    button {
+      padding: 9px 18px;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--card-bg);
+    }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
+  <div class="container">
+    <header>
+      <img src="icons/icon-48.png" alt="TabVault logo" class="logo">
+      <div>
+        <h1>TabVault Settings</h1>
+        <p class="subtitle">Configure Obsidian vault target and Markdown export preferences</p>
+      </div>
+    </header>
+
+    <div id="statusBanner" class="status-banner" role="status" aria-live="polite"></div>
+
+    <form id="settingsForm">
+      <div class="form-group">
+        <label for="vault">Obsidian Vault Name</label>
+        <input type="text" id="vault" placeholder="e.g. My Vault" required>
+        <span class="help-text">Required to deliver notes directly to Obsidian.</span>
+      </div>
+
+      <div class="form-group">
+        <label for="folder">Target Folder (Optional)</label>
+        <input type="text" id="folder" placeholder="e.g. Clippings/Tabs">
+        <span class="help-text">Folder path inside your Obsidian vault where notes will be saved.</span>
+      </div>
+
+      <div class="form-group">
+        <label for="nameTemplate">Note Name Template</label>
+        <input type="text" id="nameTemplate" placeholder="{{group}}">
+        <span class="help-text">Available tokens: <code>{{group}}</code>, <code>{{date}}</code></span>
+      </div>
+
+      <div class="form-group">
+        <label for="listStyle">Markdown List Style</label>
+        <select id="listStyle">
+          <option value="checklist">Checklist (- [ ])</option>
+          <option value="plain">Plain bullet list (-)</option>
+        </select>
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="allWindows">
+        <div>
+          <label for="allWindows" class="checkbox-label">Search across all open browser windows</label>
+          <div class="help-text">When disabled, only tab groups in the currently active window are listed.</div>
+        </div>
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="includeInternalPages">
+        <div>
+          <label for="includeInternalPages" class="checkbox-label">Include internal browser pages</label>
+          <div class="help-text">Include <code>chrome://</code>, <code>chrome-extension://</code>, and <code>about:</code> URLs.</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="resetBtn" class="btn-secondary">Reset to Defaults</button>
+        <button type="submit" class="btn-primary">Save Settings</button>
+      </div>
+    </form>
+  </div>
+
   <script type="module" src="options.js"></script>
 </body>
 </html>
-
