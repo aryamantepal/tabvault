@@ -1,0 +1,27 @@
+{
+  "name": "tabvault",
+  "version": "0.1.0",
+  "description": "Export Chrome tab groups to Obsidian as Markdown notes or to your clipboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "lint": "eslint src/ tests/ && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "npm run build && node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/chrome": "^0.0.307",
+    "@types/node": "^22.13.4",
+    "archiver": "^7.0.1",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.20.1",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.1",
+    "vitest": "^3.0.6"
+  }
+}
+
