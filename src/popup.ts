@@ -1,6 +1,7 @@
-import { formatCombinedMarkdown, formatGroupMarkdown } from "./markdown";
+import { formatCombinedMarkdown, formatGroupMarkdown, isInternalPage } from "./markdown";
 import { openObsidianUri, prepareObsidianHandoff } from "./obsidian";
 import { getSettings } from "./settings";
+import { queryGroupTabs, queryTabGroups } from "./tabs";
 import { TabGroupItem, TabItem, TabVaultSettings } from "./types";
 
 interface LoadedGroup {
@@ -46,32 +47,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
     console.error("Clipboard copy failed:", err);
     return false;
   }
-}
-
-async function fetchTabGroups(allWindows: boolean): Promise<TabGroupItem[]> {
-  const queryInfo: chrome.tabGroups.QueryInfo = {};
-  if (!allWindows) {
-    queryInfo.windowId = chrome.windows.WINDOW_ID_CURRENT;
-  }
-
-  const groups = await chrome.tabGroups.query(queryInfo);
-  return groups.map((g) => ({
-    id: g.id,
-    title: g.title,
-    color: g.color,
-    windowId: g.windowId,
-    collapsed: g.collapsed,
-  }));
-}
-
-async function fetchTabsForGroup(groupId: number): Promise<TabItem[]> {
-  const tabs = await chrome.tabs.query({ groupId });
-  return tabs.map((t) => ({
-    id: t.id,
-    title: t.title,
-    url: t.url,
-    favIconUrl: t.favIconUrl,
-  }));
 }
 
 function redirectToOptionsForVault(): void {
@@ -139,7 +114,7 @@ async function copyGroupToClipboard(
     // Count exported tabs (accounting for internal filter)
     const count = settings.includeInternalPages
       ? loaded.tabs.length
-      : loaded.tabs.filter((t) => t.url && !t.url.startsWith("chrome://") && !t.url.startsWith("about:")).length;
+      : loaded.tabs.filter((t) => !isInternalPage(t.url)).length;
     setStatus(`Copied ${count} ${count === 1 ? "link" : "links"} to clipboard.`);
   } else {
     setStatus("Failed to copy links to clipboard.", true);
@@ -158,6 +133,9 @@ async function exportAllToObsidian(
   const exportAllBtn = getElement<HTMLButtonElement>("exportAllObsidianBtn");
   exportAllBtn.disabled = true;
 
+  let sentCount = 0;
+  const fallbackGroups: LoadedGroup[] = [];
+
   try {
     for (let i = 0; i < groups.length; i++) {
       const item = groups[i];
@@ -172,8 +150,9 @@ async function exportAllToObsidian(
       const handoff = prepareObsidianHandoff(item.group.title, markdown, settings);
       if (handoff.success && handoff.type === "uri") {
         await openObsidianUri(handoff.uri);
+        sentCount++;
       } else if (handoff.success && handoff.type === "clipboard_fallback") {
-        await copyToClipboard(markdown);
+        fallbackGroups.push(item);
       }
 
       // Short delay between URIs to ensure sequential OS dispatch
@@ -181,7 +160,27 @@ async function exportAllToObsidian(
         await new Promise((resolve) => setTimeout(resolve, 350));
       }
     }
-    setStatus(`Successfully exported ${groups.length} groups to Obsidian.`);
+
+    if (fallbackGroups.length > 0) {
+      const fallbackMarkdown = formatCombinedMarkdown(
+        fallbackGroups.map((g) => ({ group: g.group, tabs: g.tabs })),
+        {
+          listStyle: settings.listStyle,
+          includeInternalPages: settings.includeInternalPages,
+        }
+      );
+      await copyToClipboard(fallbackMarkdown);
+
+      const fallbackCount = fallbackGroups.length;
+      const fallbackMsg = `${fallbackCount} ${fallbackCount === 1 ? "was" : "were"} too long for Obsidian links, so ${fallbackCount === 1 ? "it was" : "they were"} copied to the clipboard.`;
+      const message = sentCount > 0
+        ? `Sent ${sentCount} to Obsidian. ${fallbackMsg}`
+        : fallbackMsg;
+
+      setStatus(message, false, true);
+    } else {
+      setStatus(`Successfully exported ${groups.length} ${groups.length === 1 ? "group" : "groups"} to Obsidian.`);
+    }
   } catch (err) {
     setStatus(`Batch export error: ${String(err)}`, true);
   } finally {
@@ -316,11 +315,11 @@ async function initPopup(): Promise<void> {
 
   try {
     const settings = await getSettings();
-    const rawGroups = await fetchTabGroups(settings.allWindows);
+    const rawGroups = await queryTabGroups(settings.allWindows);
 
     const loadedGroups: LoadedGroup[] = await Promise.all(
       rawGroups.map(async (group) => {
-        const tabs = await fetchTabsForGroup(group.id);
+        const tabs = await queryGroupTabs(group.id);
         return { group, tabs };
       })
     );
