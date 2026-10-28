@@ -32,6 +32,7 @@ export interface MarkdownFormatOptions {
   date?: string; // YYYY-MM-DD
   listStyle?: ListStyle;
   includeInternalPages?: boolean;
+  existingNote?: ExistingNoteAction;
 }
 
 export type ObsidianHandoffResult =
@@ -44,9 +45,9 @@ export type ObsidianHandoffResult =
     }
   | {
       success: true;
-      type: "clipboard_fallback";
+      type: "clipboard_uri";
+      uri: string;
       noteName: string;
-      reason: string;
       markdown: string;
     }
   | {

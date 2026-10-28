@@ -2,12 +2,19 @@ import { getDefaultDateString } from "./markdown";
 import { ExistingNoteAction, ObsidianHandoffResult, TabVaultSettings } from "./types";
 
 /**
- * Maximum safe length for an obsidian:// URI before falling back to clipboard.
- * Windows protocol handlers invoke applications via ShellExecute and command-line
- * process creation. On Windows, command-line buffers and protocol dispatch pipelines
- * enforce limits around 8,192 characters (8 KB). Exceeding this boundary can cause
- * protocol link launches to fail silently or truncate query parameters. A threshold of
- * 8,000 characters provides a reliable safety margin across Windows and Chromium.
+ * Threshold for switching from inline content= URIs to the clipboard flow.
+ *
+ * We keep short inline content= URIs for notes under this threshold because
+ * it is non-destructive — it avoids clobbering whatever the user already has on
+ * their system clipboard. For notes exceeding the threshold, we switch to
+ * Obsidian's `clipboard` parameter (`obsidian://new?...&clipboard`), which lets
+ * Obsidian pull note content directly from the clipboard without risking OS-level
+ * URI length truncation.
+ *
+ * The 8,000 character limit is a conservative guess rather than a verified
+ * hard Windows limit. While Windows ShellExecute and CreateProcess pipelines
+ * frequently document ~8,192 character command buffers, OS protocol handler limits
+ * vary across platforms and versions. 8,000 provides a reliable safety buffer.
  */
 export const MAX_OBSIDIAN_URI_LENGTH = 8000;
 
@@ -63,11 +70,9 @@ export function sanitizeFolderPath(folder: string): string {
 }
 
 /**
- * Builds the obsidian://new URI string.
- * Query parameters are constructed with encodeURIComponent rather than URLSearchParams
- * to ensure spaces are encoded as "%20" rather than "+", which Obsidian may display literally.
- * Supports Obsidian's native existing note handling ("overwrite=true", "append=true",
- * or omitting both to create a new unique incremented note name).
+ * Builds an obsidian://new URI with inline content.
+ * Query parameters use encodeURIComponent (not URLSearchParams) so spaces are
+ * encoded as "%20" rather than "+", which Obsidian may display literally.
  */
 export function buildObsidianUri(
   vault: string,
@@ -95,9 +100,70 @@ export function buildObsidianUri(
 }
 
 /**
+ * Builds an obsidian://new URI that reads content from the system clipboard.
+ * The `clipboard` param is a bare flag (no value). This avoids embedding
+ * the note body in the URI, sidestepping OS protocol-handler length limits.
+ * See https://help.obsidian.md/Extending+Obsidian/Obsidian+URI
+ */
+export function buildObsidianClipboardUri(
+  vault: string,
+  filePath: string,
+  existingNote?: ExistingNoteAction
+): string {
+  const params: [string, string][] = [
+    ["vault", vault],
+    ["file", filePath],
+  ];
+
+  if (existingNote === "overwrite") {
+    params.push(["overwrite", "true"]);
+  } else if (existingNote === "append") {
+    params.push(["append", "true"]);
+  }
+
+  const query = params
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+
+  // `clipboard` is a bare parameter (no =value) that tells Obsidian to use
+  // the current clipboard content as the note body.
+  return `obsidian://new?${query}&clipboard`;
+}
+
+/**
+ * Strips YAML front matter and top-level # title from Markdown if present,
+ * ensuring body-only content with a ## heading for append mode.
+ */
+export function formatAppendMarkdown(
+  markdown: string,
+  groupTitle?: string,
+  date: string = getDefaultDateString()
+): string {
+  let content = markdown;
+  // Remove YAML front matter if present
+  if (content.startsWith("---")) {
+    const endFm = content.indexOf("\n---", 3);
+    if (endFm !== -1) {
+      content = content.slice(endFm + 4).replace(/^\r?\n+/, "");
+    }
+  }
+  // Remove top-level # title if present
+  content = content.replace(/^#[ \t]+[^\r\n]*\r?\n*/, "").replace(/^\r?\n+/, "");
+
+  // If it doesn't already start with a ## heading, prepend ## <group> (<date>)
+  if (!content.startsWith("## ")) {
+    const title = groupTitle?.trim() || "Untitled group";
+    content = `## ${title} (${date})\n\n${content}`;
+  }
+  return content;
+}
+
+/**
  * Prepares the Obsidian export handoff.
- * Checks for vault existence, generates the note path, builds the URI,
- * and validates length against MAX_OBSIDIAN_URI_LENGTH.
+ * For small notes, returns a "uri" result with inline content.
+ * For large notes (exceeding MAX_OBSIDIAN_URI_LENGTH), returns a "clipboard_uri"
+ * result: the caller must first write the markdown to the clipboard, then open
+ * the returned URI which uses Obsidian's `clipboard` parameter.
  */
 export function prepareObsidianHandoff(
   groupTitle: string | undefined,
@@ -120,15 +186,24 @@ export function prepareObsidianHandoff(
   const folder = sanitizeFolderPath(settings.folder);
   const filePath = folder ? `${folder}/${noteName}` : noteName;
 
-  const uri = buildObsidianUri(vault, filePath, markdown, settings.existingNote);
+  const contentToExport =
+    settings.existingNote === "append"
+      ? formatAppendMarkdown(markdown, groupTitle, date)
+      : markdown;
+
+  const uri = buildObsidianUri(vault, filePath, contentToExport, settings.existingNote);
 
   if (uri.length > MAX_OBSIDIAN_URI_LENGTH) {
+    // URI too long for safe protocol dispatch. Use the clipboard flow instead:
+    // the caller writes markdown to the clipboard, then opens a short URI with
+    // the `clipboard` flag so Obsidian reads from the clipboard.
+    const clipboardUri = buildObsidianClipboardUri(vault, filePath, settings.existingNote);
     return {
       success: true,
-      type: "clipboard_fallback",
+      type: "clipboard_uri",
+      uri: clipboardUri,
       noteName,
-      reason: `Note exceeds safe protocol URI length limit (${uri.length.toLocaleString()} > ${MAX_OBSIDIAN_URI_LENGTH.toLocaleString()} chars). Markdown was copied to clipboard instead.`,
-      markdown,
+      markdown: contentToExport,
     };
   }
 
@@ -137,7 +212,7 @@ export function prepareObsidianHandoff(
     type: "uri",
     uri,
     noteName,
-    markdown,
+    markdown: contentToExport,
   };
 }
 
