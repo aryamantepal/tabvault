@@ -3,11 +3,11 @@
   "name": "TabVault",
   "version": "0.1.0",
   "description": "Export Chrome tab groups to Obsidian as Markdown notes or to your clipboard.",
+  "minimum_chrome_version": "89",
   "permissions": [
     "tabs",
     "tabGroups",
-    "storage",
-    "clipboardWrite"
+    "storage"
   ],
   "action": {
     "default_popup": "popup.html",
