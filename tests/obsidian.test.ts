@@ -66,9 +66,15 @@ describe("sanitizeFolderPath", () => {
 });
 
 describe("buildObsidianUri", () => {
-  it("builds properly encoded obsidian://new URI", () => {
+  it("builds properly encoded obsidian://new URI with %20 spaces instead of +", () => {
     const uri = buildObsidianUri("My Vault", "Folder/Note", "# Note Title\n\nContent");
     expect(uri.startsWith("obsidian://new?")).toBe(true);
+
+    // Ensure spaces are encoded as %20 rather than +
+    expect(uri).toContain("vault=My%20Vault");
+    expect(uri).not.toContain("vault=My+Vault");
+    expect(uri).toContain("file=Folder%2FNote");
+    expect(uri).toContain("content=%23%20Note%20Title%0A%0AContent");
 
     const parsed = new URL(uri);
     expect(parsed.protocol).toBe("obsidian:");
@@ -77,6 +83,20 @@ describe("buildObsidianUri", () => {
     expect(parsed.searchParams.get("file")).toBe("Folder/Note");
     expect(parsed.searchParams.get("content")).toBe("# Note Title\n\nContent");
   });
+
+  it("handles existingNote parameter for overwrite, append, and unique", () => {
+    const uriOverwrite = buildObsidianUri("Vault", "Note", "Text", "overwrite");
+    expect(uriOverwrite).toContain("&overwrite=true");
+    expect(uriOverwrite).not.toContain("append=true");
+
+    const uriAppend = buildObsidianUri("Vault", "Note", "Text", "append");
+    expect(uriAppend).toContain("&append=true");
+    expect(uriAppend).not.toContain("overwrite=true");
+
+    const uriUnique = buildObsidianUri("Vault", "Note", "Text", "unique");
+    expect(uriUnique).not.toContain("overwrite=");
+    expect(uriUnique).not.toContain("append=");
+  });
 });
 
 describe("prepareObsidianHandoff", () => {
@@ -84,6 +104,7 @@ describe("prepareObsidianHandoff", () => {
     vault: "Personal",
     folder: "Clips",
     nameTemplate: "{{group}}",
+    existingNote: "unique" as const,
   };
 
   it("returns error if vault is empty", () => {
@@ -119,9 +140,25 @@ describe("prepareObsidianHandoff", () => {
     }
   });
 
+  it("includes overwrite param in handoff uri when configured", () => {
+    const result = prepareObsidianHandoff(
+      "Work",
+      "# Content",
+      { ...baseSettings, existingNote: "overwrite" },
+      "2026-10-28"
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success && result.type === "uri") {
+      expect(result.uri).toContain("&overwrite=true");
+    }
+  });
+
   it("falls back to clipboard when URI exceeds MAX_OBSIDIAN_URI_LENGTH", () => {
-    // Generate massive markdown content > 30,000 characters
-    const massiveContent = "# Large Export\n" + "- [ ] [Link](https://example.com/)\n".repeat(1200);
+    expect(MAX_OBSIDIAN_URI_LENGTH).toBe(8000);
+
+    // Generate markdown content > 8,000 characters
+    const massiveContent = "# Large Export\n" + "- [ ] [Link](https://example.com/)\n".repeat(350);
     expect(massiveContent.length).toBeGreaterThan(MAX_OBSIDIAN_URI_LENGTH);
 
     const result = prepareObsidianHandoff(
@@ -135,7 +172,7 @@ describe("prepareObsidianHandoff", () => {
     if (result.success) {
       expect(result.type).toBe("clipboard_fallback");
       if (result.type === "clipboard_fallback") {
-        expect(result.reason).toContain("exceeds Obsidian URI length limit");
+        expect(result.reason).toContain("exceeds safe protocol URI length limit");
         expect(result.markdown).toBe(massiveContent);
       }
     }
