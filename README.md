@@ -2,6 +2,8 @@
 
 A free, open-source Chrome extension that exports a Chrome tab group as a Markdown note in Obsidian (or to your clipboard).
 
+![TabVault demo](assets/demo.gif)
+
 > No accounts, no tracking, no servers. Everything runs locally in your browser.
 
 ## Why
@@ -17,7 +19,7 @@ Chrome has no built-in way to copy all the links in a tab group. If you keep rea
 - Two outputs:
   1. **Send to Obsidian** via an `obsidian://new` link, into a vault and folder you choose
   2. **Copy to clipboard** (also the automatic fallback when the note is too long for a URL)
-- Safe fallback for long notes: When an exported note exceeds safe operating system protocol URI limits (~8,000 characters, safeguarding against Windows protocol handler limits), TabVault automatically falls back to copying the formatted Markdown directly to your clipboard and notifies you. When using **Export All to Obsidian**, any groups exceeding the URI limit are copied together as a single combined Markdown note to your clipboard.
+- Safe protocol handling for long notes: When an exported note exceeds safe operating system protocol URI limits (~8,000 characters, safeguarding against Windows protocol handler limits), TabVault uses Obsidian's `clipboard` parameter (`obsidian://new?...&clipboard`) by copying the note to your clipboard and triggering Obsidian to import from it. When using **Export All to Obsidian**, any oversized groups are copied together as a combined Markdown note to your clipboard.
 - Settings: vault name, folder, note-name template, checklist vs. plain list, behavior if the note already exists in Obsidian (create a new unique note, overwrite, or append), search across all windows, and include/exclude internal browser pages
 - Optional "Export all groups" that produces one note per group (or copies all to clipboard)
 

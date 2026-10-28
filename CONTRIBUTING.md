@@ -66,9 +66,18 @@ Before opening a pull request, run `npm test && npm run lint && npm run build` a
    - In Settings, clear the Obsidian vault name and save.
    - In the popup, click **Obsidian**.
    - Verify TabVault alerts you and redirects directly to Settings.
-5. **URL-Length Fallback**:
-   - Verify that groups exceeding the 30,000-character URI limit automatically copy to clipboard and display an informative notice.
-6. **Theme & Responsiveness**:
+5. **Safe Protocol Length & Clipboard URI Flow**:
+   - Verify that very large groups (exceeding 8,000 characters) copy to the clipboard and trigger an `obsidian://new?...&clipboard` URI or combined clipboard copy, with an informative status message.
+6. **Append Mode**:
+   - In Settings, set "If the note exists" to **Append**.
+   - Export a group to Obsidian twice. Confirm that the second export appends only a `## <group> (<date>)` heading and the link list, without duplicating YAML front matter or `# Title`.
+7. **Export All with 3 Tab Groups (Popup Lifetime & Background Dispatch)**:
+   - Create 3 distinct tab groups in Chrome (e.g., *Job Search*, *Reading List*, *Papers*).
+   - Open the TabVault popup and click **Obsidian** under "Export all groups".
+   - Notice that Chrome closes the popup as Obsidian launches and takes OS window focus.
+   - Allow ~1.5 seconds for the background service worker to dispatch all groups sequentially with 350ms delays.
+   - Reopen the popup: verify that the status bar shows `Last export: Successfully exported 3 groups to Obsidian.` and all 3 notes exist in your Obsidian vault.
+8. **Theme & Responsiveness**:
    - Toggle system dark mode and light mode; verify popup and options render with appropriate contrast and visible focus outlines.
 
 ---
