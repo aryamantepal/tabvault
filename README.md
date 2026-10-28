@@ -17,8 +17,9 @@ Chrome has no built-in way to copy all the links in a tab group. If you keep rea
 - Two outputs:
   1. **Send to Obsidian** via an `obsidian://new` link, into a vault and folder you choose
   2. **Copy to clipboard** (also the automatic fallback when the note is too long for a URL)
-- Settings: vault name, folder, note-name template, checklist vs plain list
-- Optional "Export all groups" that produces one note per group
+- Safe fallback for long notes: When an exported note exceeds safe operating system protocol URI limits (~8,000 characters, safeguarding against Windows protocol handler limits), TabVault automatically falls back to copying the formatted Markdown directly to your clipboard and notifies you. When using **Export All to Obsidian**, any groups exceeding the URI limit are copied together as a single combined Markdown note to your clipboard.
+- Settings: vault name, folder, note-name template, checklist vs. plain list, behavior if the note already exists in Obsidian (create a new unique note, overwrite, or append), search across all windows, and include/exclude internal browser pages
+- Optional "Export all groups" that produces one note per group (or copies all to clipboard)
 
 ## Not in scope for v0.1
 
@@ -57,17 +58,17 @@ Then open `chrome://extensions`, enable Developer mode, click **Load unpacked**,
 
 1. Click the TabVault icon.
 2. Set your Obsidian vault name once in Settings.
-3. Click **Export** next to a tab group, then choose **Obsidian** or **Copy**.
+3. Click **Obsidian** or **Copy** next to a tab group (or use **Export All to Obsidian** / **Copy All to Clipboard** at the bottom).
 
 ## Privacy
 
-- Permissions requested: `tabs`, `tabGroups`, `storage` (for your settings, stored locally), and `clipboardWrite`.
+- Permissions requested: `tabs`, `tabGroups`, and `storage` (for your settings, stored locally). No `clipboardWrite` permission is needed since clipboard copying runs with user gesture activation directly from the popup.
 - No network requests. No analytics. No remote code.
-- Tab titles and URLs are read only when you click Export.
+- Tab titles and URLs are read only when you click Obsidian or Copy.
 
 ## Development
 
-- TypeScript, Manifest V3, built with esbuild (or Vite)
+- TypeScript, Manifest V3, built with esbuild
 - `npm run build` bundles to `dist/`
 - `npm run watch` rebuilds on change
 - `npm run lint` and `npm test` for the formatter unit tests

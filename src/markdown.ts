@@ -52,8 +52,11 @@ export function sanitizeTabTitle(title: string | undefined, url: string | undefi
     cleaned = "Untitled";
   }
 
-  // Escape Markdown link brackets: [ -> \[, ] -> \]
-  return cleaned.replace(/\\/g, "\\\\").replace(/\[/g, "\\[").replace(/\]/g, "\\]");
+  // Escape backslashes first, then Markdown link brackets and special formatting chars:
+  // [, ], |, *, _, <, >, `
+  return cleaned
+    .replace(/\\/g, "\\\\")
+    .replace(/([|*_<`>[\]])/g, "\\$1");
 }
 
 /**

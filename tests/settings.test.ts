@@ -29,6 +29,7 @@ describe("settings", () => {
     expect(settings.listStyle).toBe("checklist");
     expect(settings.allWindows).toBe(true);
     expect(settings.includeInternalPages).toBe(false);
+    expect(settings.existingNote).toBe("unique");
   });
 
   it("saves and retrieves updated settings", async () => {
@@ -63,5 +64,33 @@ describe("settings", () => {
     });
     const settings = await getSettings();
     expect(settings.listStyle).toBe("checklist");
+  });
+
+  it("preserves listStyle when saving other settings", async () => {
+    await saveSettings({ listStyle: "plain" });
+    let settings = await getSettings();
+    expect(settings.listStyle).toBe("plain");
+
+    await saveSettings({ vault: "MyVault" });
+    settings = await getSettings();
+    expect(settings.listStyle).toBe("plain");
+    expect(settings.vault).toBe("MyVault");
+  });
+
+  it("saves existingNote setting and normalizes invalid values", async () => {
+    await saveSettings({ existingNote: "overwrite" });
+    let settings = await getSettings();
+    expect(settings.existingNote).toBe("overwrite");
+
+    await saveSettings({ existingNote: "append" });
+    settings = await getSettings();
+    expect(settings.existingNote).toBe("append");
+
+    await saveSettings({
+      // @ts-expect-error Testing invalid runtime input
+      existingNote: "invalid_action",
+    });
+    settings = await getSettings();
+    expect(settings.existingNote).toBe("unique");
   });
 });

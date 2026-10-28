@@ -1,11 +1,15 @@
 import { getDefaultDateString } from "./markdown";
-import { ObsidianHandoffResult, TabVaultSettings } from "./types";
+import { ExistingNoteAction, ObsidianHandoffResult, TabVaultSettings } from "./types";
 
 /**
  * Maximum safe length for an obsidian:// URI before falling back to clipboard.
- * Most browsers and operating system protocol handlers have practical limits around 32KB.
+ * Windows protocol handlers invoke applications via ShellExecute and command-line
+ * process creation. On Windows, command-line buffers and protocol dispatch pipelines
+ * enforce limits around 8,192 characters (8 KB). Exceeding this boundary can cause
+ * protocol link launches to fail silently or truncate query parameters. A threshold of
+ * 8,000 characters provides a reliable safety margin across Windows and Chromium.
  */
-export const MAX_OBSIDIAN_URI_LENGTH = 30000;
+export const MAX_OBSIDIAN_URI_LENGTH = 8000;
 
 /**
  * Characters that are illegal in Obsidian / operating system filenames:
@@ -60,18 +64,34 @@ export function sanitizeFolderPath(folder: string): string {
 
 /**
  * Builds the obsidian://new URI string.
+ * Query parameters are constructed with encodeURIComponent rather than URLSearchParams
+ * to ensure spaces are encoded as "%20" rather than "+", which Obsidian may display literally.
+ * Supports Obsidian's native existing note handling ("overwrite=true", "append=true",
+ * or omitting both to create a new unique incremented note name).
  */
 export function buildObsidianUri(
   vault: string,
   filePath: string,
-  content: string
+  content: string,
+  existingNote?: ExistingNoteAction
 ): string {
-  const params = new URLSearchParams();
-  params.set("vault", vault);
-  params.set("file", filePath);
-  params.set("content", content);
+  const params: [string, string][] = [
+    ["vault", vault],
+    ["file", filePath],
+    ["content", content],
+  ];
 
-  return `obsidian://new?${params.toString()}`;
+  if (existingNote === "overwrite") {
+    params.push(["overwrite", "true"]);
+  } else if (existingNote === "append") {
+    params.push(["append", "true"]);
+  }
+
+  const query = params
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+
+  return `obsidian://new?${query}`;
 }
 
 /**
@@ -82,7 +102,9 @@ export function buildObsidianUri(
 export function prepareObsidianHandoff(
   groupTitle: string | undefined,
   markdown: string,
-  settings: Pick<TabVaultSettings, "vault" | "folder" | "nameTemplate">,
+  settings: Pick<TabVaultSettings, "vault" | "folder" | "nameTemplate"> & {
+    existingNote?: ExistingNoteAction;
+  },
   date: string = getDefaultDateString()
 ): ObsidianHandoffResult {
   const vault = settings.vault?.trim();
@@ -98,14 +120,14 @@ export function prepareObsidianHandoff(
   const folder = sanitizeFolderPath(settings.folder);
   const filePath = folder ? `${folder}/${noteName}` : noteName;
 
-  const uri = buildObsidianUri(vault, filePath, markdown);
+  const uri = buildObsidianUri(vault, filePath, markdown, settings.existingNote);
 
   if (uri.length > MAX_OBSIDIAN_URI_LENGTH) {
     return {
       success: true,
       type: "clipboard_fallback",
       noteName,
-      reason: `Note content exceeds Obsidian URI length limit (${uri.length.toLocaleString()} > ${MAX_OBSIDIAN_URI_LENGTH.toLocaleString()} chars). Markdown was copied to clipboard instead.`,
+      reason: `Note exceeds safe protocol URI length limit (${uri.length.toLocaleString()} > ${MAX_OBSIDIAN_URI_LENGTH.toLocaleString()} chars). Markdown was copied to clipboard instead.`,
       markdown,
     };
   }

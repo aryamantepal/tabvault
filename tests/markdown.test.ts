@@ -59,6 +59,32 @@ describe("sanitizeTabTitle", () => {
   it("falls back to 'Untitled' when both title and URL are empty", () => {
     expect(sanitizeTabTitle(undefined, undefined)).toBe("Untitled");
   });
+
+  it("escapes pipe characters", () => {
+    expect(sanitizeTabTitle("Site | Section | Page", "https://example.com")).toBe(
+      "Site \\| Section \\| Page"
+    );
+  });
+
+  it("escapes asterisks and underscores", () => {
+    expect(sanitizeTabTitle("*Important* _Note_", "https://example.com")).toBe(
+      "\\*Important\\* \\_Note\\_"
+    );
+  });
+
+  it("escapes angle brackets and backticks", () => {
+    expect(sanitizeTabTitle("<Component> with `props`", "https://example.com")).toBe(
+      "\\<Component\\> with \\`props\\`"
+    );
+  });
+
+  it("escapes mixed markdown special characters and brackets together", () => {
+    expect(
+      sanitizeTabTitle("[PR #1] Fix: *fast* | `v1.0` <urgent> & _clean_", "https://example.com")
+    ).toBe(
+      "\\[PR #1\\] Fix: \\*fast\\* \\| \\`v1.0\\` \\<urgent\\> & \\_clean\\_"
+    );
+  });
 });
 
 describe("sanitizeMarkdownUrl", () => {

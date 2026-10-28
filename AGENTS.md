@@ -9,7 +9,7 @@ Build a Chrome (Manifest V3) extension that exports a Chrome tab group as a Mark
 ## Hard constraints
 
 - Manifest V3, TypeScript, no runtime dependencies (dev dependencies only).
-- Permissions: `tabs`, `tabGroups`, `storage`, `clipboardWrite`. Do not add host permissions, `<all_urls>`, `history`, or `bookmarks`.
+- Permissions: `tabs`, `tabGroups`, `storage`. Do not add host permissions, `<all_urls>`, `history`, or `bookmarks`.
 - No network requests, analytics, telemetry, or remote code. Everything is local.
 - No frameworks for the popup (plain TypeScript and DOM, small CSS). Keep the bundle tiny.
 - License is MIT. Do not add code with an incompatible license.
@@ -19,14 +19,15 @@ Build a Chrome (Manifest V3) extension that exports a Chrome tab group as a Mark
 ```
 tabvault/
 ├── src/
-│   ├── background.ts     # service worker: tab group queries via chrome.tabGroups / chrome.tabs
+│   ├── background.ts     # service worker: installation defaults
 │   ├── popup.ts          # popup UI: list groups, export buttons, status messages
 │   ├── popup.html
-│   ├── options.ts        # settings page (vault, folder, name template, list style)
+│   ├── options.ts        # settings page (vault, folder, name template, list style, existing note)
 │   ├── options.html
 │   ├── markdown.ts       # PURE functions: groups + tabs -> Markdown string (unit tested)
 │   ├── obsidian.ts       # builds obsidian://new URIs, handles URL-length fallback
-│   ├── settings.ts       # typed wrapper over chrome.storage.sync/local
+│   ├── settings.ts       # typed wrapper over chrome.storage.local
+│   ├── tabs.ts           # shared tab and group queries via chrome.tabGroups / chrome.tabs
 │   └── types.ts
 ├── public/
 │   ├── manifest.json
@@ -75,7 +76,7 @@ Rules:
 ### Obsidian handoff (`obsidian.ts`)
 - URI form: `obsidian://new?vault=<vault>&file=<folder/name>&content=<encoded markdown>` with everything `encodeURIComponent`-encoded.
 - Note name comes from a template, default `{{group}}`. Supported tokens: `{{group}}`, `{{date}}`. Strip characters that are illegal in file names (`\ / : * ? " < > |`).
-- If the encoded URI is longer than about 30,000 characters (make it a constant), do not open it. Copy the Markdown to the clipboard and tell the user why.
+- If the encoded URI is longer than about 8,000 characters (make it a constant), do not open it. Copy the Markdown to the clipboard and tell the user why.
 - Open the URI with `chrome.tabs.create({ url })` and close that tab afterwards, or use `chrome.tabs.update` on the current tab. Pick whichever works reliably and document the choice in a comment.
 - If no vault name is set, open the options page and show a message.
 
@@ -83,7 +84,7 @@ Rules:
 - Use `navigator.clipboard.writeText` from the popup (user gesture). Show "Copied N links" feedback.
 
 ### Settings (`settings.ts`)
-Defaults: `vault: ""`, `folder: ""`, `nameTemplate: "{{group}}"`, `listStyle: "checklist"`, `allWindows: true`, `includeInternalPages: false`. Store them in `chrome.storage.local`. Do not use `chrome.storage.sync`, because the author does not want cloud sync.
+Defaults: `vault: ""`, `folder: ""`, `nameTemplate: "{{group}}"`, `listStyle: "checklist"`, `allWindows: true`, `includeInternalPages: false`, `existingNote: "unique"`. Store them in `chrome.storage.local`. Do not use `chrome.storage.sync`, because the author does not want cloud sync.
 
 ### Export all
 - A button that exports every group, one note each, one after another. Because opening many `obsidian://` URIs is flaky, add a short delay between them and a clear progress message. If that is unreliable, fall back to one combined Markdown copied to the clipboard with `## <group>` sections.

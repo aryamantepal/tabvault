@@ -1,5 +1,7 @@
 export type ListStyle = "checklist" | "plain";
 
+export type ExistingNoteAction = "unique" | "overwrite" | "append";
+
 export interface TabItem {
   id?: number;
   title?: string;
@@ -23,6 +25,7 @@ export interface TabVaultSettings {
   listStyle: ListStyle;
   allWindows: boolean;
   includeInternalPages: boolean;
+  existingNote: ExistingNoteAction;
 }
 
 export interface MarkdownFormatOptions {
