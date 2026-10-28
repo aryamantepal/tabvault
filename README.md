@@ -45,7 +45,7 @@ tabs: 3
 ## Install (development)
 
 ```bash
-git clone https://github.com/<your-username>/tabvault.git
+git clone https://github.com/aryamantepal/tabvault.git
 cd tabvault
 npm install
 npm run build
