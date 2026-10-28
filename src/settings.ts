@@ -1,4 +1,4 @@
-import { TabVaultSettings } from "./types";
+import { ExistingNoteAction, TabVaultSettings } from "./types";
 
 export const DEFAULT_SETTINGS: TabVaultSettings = {
   vault: "",
@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: TabVaultSettings = {
   listStyle: "checklist",
   allWindows: true,
   includeInternalPages: false,
+  existingNote: "unique",
 };
 
 const STORAGE_KEY = "tabvault_settings";
@@ -36,11 +37,20 @@ export async function saveSettings(
   updates: Partial<TabVaultSettings>
 ): Promise<TabVaultSettings> {
   const current = await getSettings();
+  const rawListStyle = updates.listStyle ?? current.listStyle;
+  const listStyle = rawListStyle === "plain" ? "plain" : "checklist";
+
+  const rawExistingNote = updates.existingNote ?? current.existingNote;
+  const existingNote: ExistingNoteAction =
+    rawExistingNote === "overwrite" || rawExistingNote === "append"
+      ? rawExistingNote
+      : "unique";
+
   const next: TabVaultSettings = {
     ...current,
     ...updates,
-    // Ensure listStyle is valid
-    listStyle: updates.listStyle === "plain" ? "plain" : "checklist",
+    listStyle,
+    existingNote,
   };
 
   if (typeof chrome !== "undefined" && chrome.storage?.local) {

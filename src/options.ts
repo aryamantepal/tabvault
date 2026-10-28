@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, getSettings, resetSettings, saveSettings } from "./settings";
-import { ListStyle, TabVaultSettings } from "./types";
+import { ExistingNoteAction, ListStyle, TabVaultSettings } from "./types";
 
 function getElement<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -29,6 +29,7 @@ function populateForm(settings: TabVaultSettings): void {
   getElement<HTMLInputElement>("folder").value = settings.folder;
   getElement<HTMLInputElement>("nameTemplate").value = settings.nameTemplate;
   getElement<HTMLSelectElement>("listStyle").value = settings.listStyle;
+  getElement<HTMLSelectElement>("existingNote").value = settings.existingNote || "unique";
   getElement<HTMLInputElement>("allWindows").checked = settings.allWindows;
   getElement<HTMLInputElement>("includeInternalPages").checked = settings.includeInternalPages;
 }
@@ -52,6 +53,7 @@ async function initOptions(): Promise<void> {
     const folder = getElement<HTMLInputElement>("folder").value.trim();
     const nameTemplate = getElement<HTMLInputElement>("nameTemplate").value.trim() || DEFAULT_SETTINGS.nameTemplate;
     const listStyle = getElement<HTMLSelectElement>("listStyle").value as ListStyle;
+    const existingNote = getElement<HTMLSelectElement>("existingNote").value as ExistingNoteAction;
     const allWindows = getElement<HTMLInputElement>("allWindows").checked;
     const includeInternalPages = getElement<HTMLInputElement>("includeInternalPages").checked;
 
@@ -61,6 +63,7 @@ async function initOptions(): Promise<void> {
         folder,
         nameTemplate,
         listStyle,
+        existingNote,
         allWindows,
         includeInternalPages,
       });

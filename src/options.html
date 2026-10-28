@@ -253,6 +253,16 @@
         </select>
       </div>
 
+      <div class="form-group">
+        <label for="existingNote">If the note exists</label>
+        <select id="existingNote">
+          <option value="unique">New unique name</option>
+          <option value="overwrite">Overwrite</option>
+          <option value="append">Append</option>
+        </select>
+        <span class="help-text">What to do if a note with the same name already exists in your vault.</span>
+      </div>
+
       <div class="checkbox-group">
         <input type="checkbox" id="allWindows">
         <div>
