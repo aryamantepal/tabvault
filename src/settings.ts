@@ -8,6 +8,8 @@ export const DEFAULT_SETTINGS: TabVaultSettings = {
   allWindows: true,
   includeInternalPages: false,
   existingNote: "unique",
+  legacyMode: false,
+  silent: false,
 };
 
 const STORAGE_KEY = "tabvault_settings";

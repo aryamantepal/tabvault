@@ -15,6 +15,8 @@ describe("planBatchExport", () => {
     allWindows: true,
     includeInternalPages: false,
     existingNote: "unique",
+    legacyMode: false,
+    silent: false,
   };
 
   it("plans direct URI export when all groups fit within URI limits", () => {

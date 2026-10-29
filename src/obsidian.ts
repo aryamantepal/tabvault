@@ -2,19 +2,15 @@ import { getDefaultDateString } from "./markdown";
 import { ExistingNoteAction, ObsidianHandoffResult, TabVaultSettings } from "./types";
 
 /**
- * Threshold for switching from inline content= URIs to the clipboard flow.
+ * Maximum length of an inline `content=` URI. It applies only where the note
+ * body travels in the link: legacy mode, and the fallback when the clipboard
+ * write fails. The default flow keeps the body on the clipboard, so its URI is
+ * short regardless of note size.
  *
- * We keep short inline content= URIs for notes under this threshold because
- * it is non-destructive — it avoids clobbering whatever the user already has on
- * their system clipboard. For notes exceeding the threshold, we switch to
- * Obsidian's `clipboard` parameter (`obsidian://new?...&clipboard`), which lets
- * Obsidian pull note content directly from the clipboard without risking OS-level
- * URI length truncation.
- *
- * The 8,000 character limit is a conservative guess rather than a verified
- * hard Windows limit. While Windows ShellExecute and CreateProcess pipelines
- * frequently document ~8,192 character command buffers, OS protocol handler limits
- * vary across platforms and versions. 8,000 provides a reliable safety buffer.
+ * The limit is a conservative guess rather than a verified hard Windows
+ * limit. Windows ShellExecute and CreateProcess pipelines document ~8,192
+ * character command buffers, and protocol handler limits vary across
+ * platforms and versions, so 8,000 leaves a safety buffer.
  */
 export const MAX_OBSIDIAN_URI_LENGTH = 8000;
 
@@ -70,71 +66,75 @@ export function sanitizeFolderPath(folder: string): string {
 }
 
 /**
- * Builds an obsidian://new URI with inline content.
- * Query parameters use encodeURIComponent (not URLSearchParams) so spaces are
- * encoded as "%20" rather than "+", which Obsidian may display literally.
+ * Shown by Obsidian only when it can't read the clipboard. It is a string the
+ * user can act on, not a note body, so the user is never left with a silent
+ * empty note.
+ */
+export const CLIPBOARD_FALLBACK_MESSAGE =
+  "TabVault couldn't share the clipboard with Obsidian. Paste with Cmd/Ctrl+V.";
+
+function buildQuery(
+  vault: string | undefined,
+  filePath: string,
+  content: string | undefined,
+  existingNote: ExistingNoteAction | undefined,
+  silent: boolean | undefined
+): string {
+  const params: [string, string][] = [];
+
+  const trimmedVault = vault?.trim();
+  if (trimmedVault) {
+    params.push(["vault", trimmedVault]);
+  }
+
+  params.push(["file", filePath]);
+  if (content !== undefined) {
+    params.push(["content", content]);
+  }
+
+  if (existingNote === "overwrite") {
+    params.push(["overwrite", "true"]);
+  } else if (existingNote === "append") {
+    params.push(["append", "true"]);
+  }
+
+  if (silent) {
+    params.push(["silent", "true"]);
+  }
+
+  // encodeURIComponent rather than URLSearchParams so spaces become "%20", not
+  // "+", which Obsidian may display literally.
+  return params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+}
+
+/**
+ * Builds an obsidian://new URI that carries the note body in `content=`.
+ * Used by legacy mode and as the fallback when the clipboard write fails.
  */
 export function buildObsidianUri(
   vault: string | undefined,
   filePath: string,
   content: string,
-  existingNote?: ExistingNoteAction
+  existingNote?: ExistingNoteAction,
+  silent?: boolean
 ): string {
-  const params: [string, string][] = [];
-
-  const trimmedVault = vault?.trim();
-  if (trimmedVault) {
-    params.push(["vault", trimmedVault]);
-  }
-
-  params.push(["file", filePath]);
-  params.push(["content", content]);
-
-  if (existingNote === "overwrite") {
-    params.push(["overwrite", "true"]);
-  } else if (existingNote === "append") {
-    params.push(["append", "true"]);
-  }
-
-  const query = params
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join("&");
-
-  return `obsidian://new?${query}`;
+  return `obsidian://new?${buildQuery(vault, filePath, content, existingNote, silent)}`;
 }
 
 /**
- * Builds an obsidian://new URI that reads content from the system clipboard.
- * The `clipboard` param is a bare flag (no value). This avoids embedding
- * the note body in the URI, sidestepping OS protocol-handler length limits.
+ * Builds an obsidian://new URI that reads the note body from the system
+ * clipboard. The `clipboard` param is a bare flag (no value) and is appended
+ * last. The short `content=` message is only used by Obsidian when it can't
+ * read the clipboard.
  * See https://help.obsidian.md/Extending+Obsidian/Obsidian+URI
  */
 export function buildObsidianClipboardUri(
   vault: string | undefined,
   filePath: string,
-  existingNote?: ExistingNoteAction
+  existingNote?: ExistingNoteAction,
+  silent?: boolean
 ): string {
-  const params: [string, string][] = [];
-
-  const trimmedVault = vault?.trim();
-  if (trimmedVault) {
-    params.push(["vault", trimmedVault]);
-  }
-
-  params.push(["file", filePath]);
-
-  if (existingNote === "overwrite") {
-    params.push(["overwrite", "true"]);
-  } else if (existingNote === "append") {
-    params.push(["append", "true"]);
-  }
-
-  const query = params
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join("&");
-
-  // `clipboard` is a bare parameter (no =value) that tells Obsidian to use
-  // the current clipboard content as the note body.
+  const query = buildQuery(vault, filePath, CLIPBOARD_FALLBACK_MESSAGE, existingNote, silent);
   return `obsidian://new?${query}&clipboard`;
 }
 
@@ -168,16 +168,22 @@ export function formatAppendMarkdown(
 
 /**
  * Prepares the Obsidian export handoff.
- * For small notes, returns a "uri" result with inline content.
- * For large notes (exceeding MAX_OBSIDIAN_URI_LENGTH), returns a "clipboard_uri"
- * result: the caller must first write the markdown to the clipboard, then open
- * the returned URI which uses Obsidian's `clipboard` parameter.
+ *
+ * Default: returns a "clipboard_uri" result. The caller must write `markdown`
+ * to the clipboard, then open `uri`. If that write fails, the caller opens
+ * `fallbackUri` (inline content) instead; it is undefined when the inline URI
+ * would exceed MAX_OBSIDIAN_URI_LENGTH, in which case there is no safe fallback.
+ *
+ * Legacy mode: returns a "uri" result with inline content, switching to
+ * "clipboard_uri" only when that URI is too long.
  */
 export function prepareObsidianHandoff(
   groupTitle: string | undefined,
   markdown: string,
   settings: Pick<TabVaultSettings, "vault" | "folder" | "nameTemplate"> & {
     existingNote?: ExistingNoteAction;
+    legacyMode?: boolean;
+    silent?: boolean;
   },
   date: string = getDefaultDateString()
 ): ObsidianHandoffResult {
@@ -192,44 +198,46 @@ export function prepareObsidianHandoff(
       ? formatAppendMarkdown(markdown, groupTitle, date)
       : markdown;
 
-  const uri = buildObsidianUri(vault, filePath, contentToExport, settings.existingNote);
+  const inlineUri = buildObsidianUri(
+    vault,
+    filePath,
+    contentToExport,
+    settings.existingNote,
+    settings.silent
+  );
+  const inlineFits = inlineUri.length <= MAX_OBSIDIAN_URI_LENGTH;
 
-  if (uri.length > MAX_OBSIDIAN_URI_LENGTH) {
-    // URI too long for safe protocol dispatch. Use the clipboard flow instead:
-    // the caller writes markdown to the clipboard, then opens a short URI with
-    // the `clipboard` flag so Obsidian reads from the clipboard.
-    const clipboardUri = buildObsidianClipboardUri(vault, filePath, settings.existingNote);
-    return {
-      success: true,
-      type: "clipboard_uri",
-      uri: clipboardUri,
-      noteName,
-      markdown: contentToExport,
-    };
+  if (settings.legacyMode && inlineFits) {
+    return { success: true, type: "uri", uri: inlineUri, noteName, markdown: contentToExport };
   }
 
   return {
     success: true,
-    type: "uri",
-    uri,
+    type: "clipboard_uri",
+    uri: buildObsidianClipboardUri(vault, filePath, settings.existingNote, settings.silent),
+    fallbackUri: inlineFits ? inlineUri : undefined,
     noteName,
     markdown: contentToExport,
   };
 }
 
 /**
- * Dispatches an obsidian:// URI via Chrome tabs API.
- * We create an inactive tab to trigger the protocol handler and immediately close it.
- * This prevents leaving an empty orphaned tab in the user's browser window.
+ * Dispatches an obsidian:// URI by navigating the active tab to it.
+ *
+ * The earlier approach (create a hidden tab, close it after 500 ms) could
+ * cancel the protocol handoff, or Chrome's "Open Obsidian?" prompt, before it
+ * finished. Navigating the active tab creates nothing to clean up, and Chrome
+ * keeps showing the current page because external protocols don't replace it.
+ * Falls back to a new tab only when there is no active tab to reuse.
+ *
+ * Must run in the service worker (see OPEN_OBSIDIAN_URI in background.ts): the
+ * popup can be destroyed the moment Obsidian takes focus.
  */
 export async function openObsidianUri(uri: string): Promise<void> {
-  const tab = await chrome.tabs.create({ url: uri, active: false });
-  if (tab.id !== undefined) {
-    // A short 500ms delay ensures the OS protocol dispatcher handles the request before tab cleanup
-    setTimeout(() => {
-      chrome.tabs.remove(tab.id!).catch(() => {
-        // Tab may have already been closed automatically by Chrome
-      });
-    }, 500);
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (activeTab?.id !== undefined) {
+    await chrome.tabs.update(activeTab.id, { url: uri });
+  } else {
+    await chrome.tabs.create({ url: uri });
   }
 }

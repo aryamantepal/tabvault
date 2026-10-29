@@ -30,6 +30,8 @@ describe("settings", () => {
     expect(settings.allWindows).toBe(true);
     expect(settings.includeInternalPages).toBe(false);
     expect(settings.existingNote).toBe("unique");
+    expect(settings.legacyMode).toBe(false);
+    expect(settings.silent).toBe(false);
   });
 
   it("saves and retrieves updated settings", async () => {
@@ -46,6 +48,22 @@ describe("settings", () => {
     // Unchanged defaults remain
     expect(settings.nameTemplate).toBe("{{group}}");
     expect(settings.allWindows).toBe(true);
+  });
+
+  it("persists legacyMode and silent without disturbing other settings", async () => {
+    await saveSettings({ legacyMode: true, silent: true });
+    await saveSettings({ vault: "MyVault" });
+    const settings = await getSettings();
+    expect(settings.legacyMode).toBe(true);
+    expect(settings.silent).toBe(true);
+    expect(settings.vault).toBe("MyVault");
+  });
+
+  it("fills legacyMode and silent defaults for settings stored before they existed", async () => {
+    memoryStore["tabvault_settings"] = { vault: "Old", listStyle: "plain" };
+    const settings = await getSettings();
+    expect(settings.legacyMode).toBe(false);
+    expect(settings.silent).toBe(false);
   });
 
   it("resets settings to defaults", async () => {

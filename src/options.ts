@@ -32,6 +32,8 @@ function populateForm(settings: TabVaultSettings): void {
   getElement<HTMLSelectElement>("existingNote").value = settings.existingNote || "unique";
   getElement<HTMLInputElement>("allWindows").checked = settings.allWindows;
   getElement<HTMLInputElement>("includeInternalPages").checked = settings.includeInternalPages;
+  getElement<HTMLInputElement>("legacyMode").checked = settings.legacyMode;
+  getElement<HTMLInputElement>("silent").checked = settings.silent;
 }
 
 async function initOptions(): Promise<void> {
@@ -48,6 +50,8 @@ async function initOptions(): Promise<void> {
     const existingNote = getElement<HTMLSelectElement>("existingNote").value as ExistingNoteAction;
     const allWindows = getElement<HTMLInputElement>("allWindows").checked;
     const includeInternalPages = getElement<HTMLInputElement>("includeInternalPages").checked;
+    const legacyMode = getElement<HTMLInputElement>("legacyMode").checked;
+    const silent = getElement<HTMLInputElement>("silent").checked;
 
     try {
       await saveSettings({
@@ -58,6 +62,8 @@ async function initOptions(): Promise<void> {
         existingNote,
         allWindows,
         includeInternalPages,
+        legacyMode,
+        silent,
       });
       showStatus("Settings saved successfully.");
     } catch (err) {
