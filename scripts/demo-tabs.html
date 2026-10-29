@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TabVault Demo Setup Tabs</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 720px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.5;
+      color: #1e293b;
+      background: #f8fafc;
+    }
+    h1 { margin-bottom: 8px; }
+    p.sub { color: #64748b; margin-top: 0; margin-bottom: 24px; }
+    .group {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .group-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .blue { background: #1a73e8; }
+    .red { background: #d93025; }
+    .green { background: #1e8e3e; }
+    button {
+      background: #7c3aed;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover { background: #6d28d9; }
+    ul { margin: 0; padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .instructions {
+      background: #f1f5f9;
+      border-left: 4px solid #7c3aed;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>TabVault Demo Setup</h1>
+  <p class="sub">Open these links to create the 3 tab groups used for demo recording and testing.</p>
+
+  <div class="instructions">
+    <strong>Quick Setup:</strong> Click "Open All in New Tabs" for each group. Then right-click the first tab in each set and select <em>"Add tab to new group"</em>, name the group, set the color, and drag the other tabs in.
+  </div>
+
+  <!-- Group 1: Job Search -->
+  <div class="group">
+    <div class="group-header">
+      <div class="group-title">
+        <span class="badge blue"></span>
+        Job Search (Blue)
+      </div>
+      <button onclick="openGroup('job-search')">Open All in Tabs</button>
+    </div>
+    <ul id="job-search">
+      <li><a href="https://github.com/about/careers" target="_blank" rel="noreferrer">GitHub - Careers and Open Roles</a></li>
+      <li><a href="https://stripe.com/jobs" target="_blank" rel="noreferrer">Stripe - Jobs and Engineering Careers</a></li>
+      <li><a href="https://www.anthropic.com/careers" target="_blank" rel="noreferrer">Anthropic - Careers in AI Safety</a></li>
+      <li><a href="https://www.cloudflare.com/careers/" target="_blank" rel="noreferrer">Cloudflare - Careers and Openings</a></li>
+      <li><a href="https://vercel.com/careers" target="_blank" rel="noreferrer">Vercel - Careers and Engineering</a></li>
+    </ul>
+  </div>
+
+  <!-- Group 2: Reading List -->
+  <div class="group">
+    <div class="group-header">
+      <div class="group-title">
+        <span class="badge red"></span>
+        Reading List (Red)
+      </div>
+      <button onclick="openGroup('reading-list')">Open All in Tabs</button>
+    </div>
+    <ul id="reading-list">
+      <li><a href="https://spec.commonmark.org/" target="_blank" rel="noreferrer">CommonMark Spec - Markdown Specification</a></li>
+      <li><a href="https://www.sqlite.org/arch.html" target="_blank" rel="noreferrer">SQLite Architecture Documentation</a></li>
+      <li><a href="https://doc.rust-lang.org/book/" target="_blank" rel="noreferrer">The Rust Programming Language Book</a></li>
+      <li><a href="https://css-tricks.com/snippets/css/a-guide-to-flexbox/" target="_blank" rel="noreferrer">CSS-Tricks - A Complete Guide to Flexbox</a></li>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json" target="_blank" rel="noreferrer">MDN Web Docs - Manifest V3 Guide</a></li>
+    </ul>
+  </div>
+
+  <!-- Group 3: Papers -->
+  <div class="group">
+    <div class="group-header">
+      <div class="group-title">
+        <span class="badge green"></span>
+        Papers (Green)
+      </div>
+      <button onclick="openGroup('papers')">Open All in Tabs</button>
+    </div>
+    <ul id="papers">
+      <li><a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">Attention Is All You Need (arXiv:1706.03762)</a></li>
+      <li><a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noreferrer">FlashAttention: Fast Memory-Efficient Attention (arXiv:2205.14135)</a></li>
+      <li><a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">LoRA: Low-Rank Adaptation of LLMs (arXiv:2106.09685)</a></li>
+      <li><a href="https://arxiv.org/abs/2412.19437" target="_blank" rel="noreferrer">DeepSeek-V3 Technical Report (arXiv:2412.19437)</a></li>
+      <li><a href="https://arxiv.org/abs/2407.21783" target="_blank" rel="noreferrer">The Llama 3 Herd of Models (arXiv:2407.21783)</a></li>
+    </ul>
+  </div>
+
+  <script>
+    function openGroup(listId) {
+      const links = document.querySelectorAll('#' + listId + ' a');
+      links.forEach((a) => {
+        window.open(a.href, '_blank');
+      });
+    }
+  </script>
+</body>
+</html>

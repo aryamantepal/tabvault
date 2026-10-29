@@ -66,9 +66,15 @@ describe("sanitizeTabTitle", () => {
     );
   });
 
-  it("escapes asterisks and underscores", () => {
+  it("escapes asterisks and boundary underscores but preserves mid-word underscores", () => {
     expect(sanitizeTabTitle("*Important* _Note_", "https://example.com")).toBe(
       "\\*Important\\* \\_Note\\_"
+    );
+    expect(sanitizeTabTitle("my_var_name and snake_case", "https://example.com")).toBe(
+      "my_var_name and snake_case"
+    );
+    expect(sanitizeTabTitle("_leading and trailing_", "https://example.com")).toBe(
+      "\\_leading and trailing\\_"
     );
   });
 
@@ -204,6 +210,94 @@ describe("formatGroupMarkdown", () => {
 
     expect(output).toContain('group: "Project: 2026 #Launch"');
     expect(output).toContain("# Project: 2026 #Launch");
+  });
+
+  describe("existingNote modes in formatGroupMarkdown", () => {
+    const sampleTabs: TabItem[] = [
+      { title: "GitHub", url: "https://github.com" },
+      { title: "Example", url: "https://example.com" },
+    ];
+
+    it("append mode outputs body only with ## heading and no front matter or # Title", () => {
+      const output = formatGroupMarkdown(
+        { title: "Job Search", color: "blue" },
+        sampleTabs,
+        {
+          date: "2026-10-28",
+          listStyle: "checklist",
+          existingNote: "append",
+        }
+      );
+
+      // Must not contain YAML front matter delimiters or properties
+      expect(output).not.toContain("---");
+      expect(output).not.toContain("source: TabVault");
+      expect(output).not.toContain("group:");
+      expect(output).not.toContain("color:");
+      expect(output).not.toContain("exported:");
+      expect(output).not.toContain("tabs:");
+
+      // Must not contain # Title
+      expect(output).not.toMatch(/^#[^#]/m);
+
+      // Must contain ## heading with date
+      expect(output).toContain("## Job Search (2026-10-28)");
+      expect(output).toContain("- [ ] [GitHub](https://github.com)");
+      expect(output).toContain("- [ ] [Example](https://example.com)");
+
+      // Check exact format
+      const expected = [
+        "## Job Search (2026-10-28)",
+        "",
+        "- [ ] [GitHub](https://github.com)",
+        "- [ ] [Example](https://example.com)",
+      ].join("\n");
+      expect(output).toBe(expected);
+    });
+
+    it("overwrite mode keeps full note with YAML front matter and # Title", () => {
+      const output = formatGroupMarkdown(
+        { title: "Job Search", color: "blue" },
+        sampleTabs,
+        {
+          date: "2026-10-28",
+          listStyle: "checklist",
+          existingNote: "overwrite",
+        }
+      );
+
+      expect(output).toContain("---");
+      expect(output).toContain("source: TabVault");
+      expect(output).toContain("group: Job Search");
+      expect(output).toContain("color: blue");
+      expect(output).toContain("exported: 2026-10-28");
+      expect(output).toContain("tabs: 2");
+      expect(output).toContain("# Job Search");
+      expect(output).toContain("- [ ] [GitHub](https://github.com)");
+      expect(output).toContain("- [ ] [Example](https://example.com)");
+    });
+
+    it("unique mode keeps full note with YAML front matter and # Title", () => {
+      const output = formatGroupMarkdown(
+        { title: "Job Search", color: "blue" },
+        sampleTabs,
+        {
+          date: "2026-10-28",
+          listStyle: "checklist",
+          existingNote: "unique",
+        }
+      );
+
+      expect(output).toContain("---");
+      expect(output).toContain("source: TabVault");
+      expect(output).toContain("group: Job Search");
+      expect(output).toContain("color: blue");
+      expect(output).toContain("exported: 2026-10-28");
+      expect(output).toContain("tabs: 2");
+      expect(output).toContain("# Job Search");
+      expect(output).toContain("- [ ] [GitHub](https://github.com)");
+      expect(output).toContain("- [ ] [Example](https://example.com)");
+    });
   });
 });
 

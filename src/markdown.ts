@@ -53,10 +53,14 @@ export function sanitizeTabTitle(title: string | undefined, url: string | undefi
   }
 
   // Escape backslashes first, then Markdown link brackets and special formatting chars:
-  // [, ], |, *, _, <, >, `
+  // [, ], |, *, <, >, `
+  // Underscores are only escaped at word boundaries (e.g. leading, trailing, or
+  // whitespace-adjacent) where they could trigger emphasis. Mid-word underscores
+  // like snake_case or identifiers do not trigger emphasis in CommonMark and stay unescaped.
   return cleaned
     .replace(/\\/g, "\\\\")
-    .replace(/([|*_<`>[\]])/g, "\\$1");
+    .replace(/([|*<`>[\]])/g, "\\$1")
+    .replace(/(?<![a-zA-Z0-9])_|_(?![a-zA-Z0-9])/g, "\\_");
 }
 
 /**
@@ -106,6 +110,8 @@ export function getDefaultDateString(): string {
 
 /**
  * Formats a tab group and its tabs into the standard TabVault Markdown note.
+ * In "append" mode, produces only a ## heading and link list (no front matter,
+ * no # title) since this content will be appended to an existing note.
  */
 export function formatGroupMarkdown(
   group: Pick<TabGroupItem, "title" | "color">,
@@ -116,10 +122,10 @@ export function formatGroupMarkdown(
     date = getDefaultDateString(),
     listStyle = "checklist",
     includeInternalPages = false,
+    existingNote,
   } = options;
 
   const rawGroupTitle = group.title?.trim() || "Untitled group";
-  const color = group.color || "grey";
 
   // Filter tabs according to settings
   const filteredTabs = includeInternalPages
@@ -127,8 +133,15 @@ export function formatGroupMarkdown(
     : tabs.filter((t) => !isInternalPage(t.url));
 
   const tabLines = filteredTabs.map((t) => formatTabListItem(t, listStyle));
-  const tabsCount = filteredTabs.length;
 
+  // Append mode: body only — a ## heading with the date, then links. No YAML, no # title.
+  if (existingNote === "append") {
+    return formatAppendBody(rawGroupTitle, date, tabLines);
+  }
+
+  // Full note with YAML front matter for "unique" and "overwrite" modes
+  const color = group.color || "grey";
+  const tabsCount = filteredTabs.length;
   const yamlGroup = quoteYamlString(rawGroupTitle);
   const headerTitle = rawGroupTitle.replace(/[\r\n]+/g, " ").trim();
 
@@ -142,6 +155,28 @@ export function formatGroupMarkdown(
     "---",
     "",
     `# ${headerTitle}`,
+    "",
+  ];
+
+  if (tabLines.length > 0) {
+    lines.push(...tabLines);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Formats body content for append mode: a ## heading with group name and date,
+ * followed by the link list. No YAML front matter or # title.
+ */
+export function formatAppendBody(
+  groupTitle: string,
+  date: string,
+  tabLines: string[]
+): string {
+  const headerTitle = groupTitle.replace(/[\r\n]+/g, " ").trim();
+  const lines: string[] = [
+    `## ${headerTitle} (${date})`,
     "",
   ];
 

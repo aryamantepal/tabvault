@@ -1,13 +1,15 @@
+import {
+  BatchExportResult,
+  formatBatchResultSummary,
+  LAST_EXPORT_STORAGE_KEY,
+  LoadedGroup,
+  planBatchExport,
+} from "./batch";
 import { formatCombinedMarkdown, formatGroupMarkdown, isInternalPage } from "./markdown";
 import { openObsidianUri, prepareObsidianHandoff } from "./obsidian";
 import { getSettings } from "./settings";
 import { queryGroupTabs, queryTabGroups } from "./tabs";
-import { TabGroupItem, TabItem, TabVaultSettings } from "./types";
-
-interface LoadedGroup {
-  group: TabGroupItem;
-  tabs: TabItem[];
-}
+import { TabVaultSettings } from "./types";
 
 function getElement<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -72,6 +74,7 @@ async function exportGroupToObsidian(
   const markdown = formatGroupMarkdown(loaded.group, loaded.tabs, {
     listStyle: settings.listStyle,
     includeInternalPages: settings.includeInternalPages,
+    existingNote: settings.existingNote,
   });
 
   const handoff = prepareObsidianHandoff(
@@ -89,9 +92,16 @@ async function exportGroupToObsidian(
     return;
   }
 
-  if (handoff.type === "clipboard_fallback") {
-    await copyToClipboard(handoff.markdown);
-    setStatus(handoff.reason, true, true);
+  if (handoff.type === "clipboard_uri") {
+    // Large note: copy markdown to clipboard, then open obsidian://new with &clipboard
+    const ok = await copyToClipboard(handoff.markdown);
+    if (!ok) {
+      setStatus("Failed to copy note to clipboard for Obsidian.", true);
+      return;
+    }
+    await openObsidianUri(handoff.uri);
+    const groupName = loaded.group.title?.trim() || "Untitled group";
+    setStatus(`Sent "${groupName}" to Obsidian via clipboard.`);
     return;
   }
 
@@ -111,7 +121,6 @@ async function copyGroupToClipboard(
 
   const ok = await copyToClipboard(markdown);
   if (ok) {
-    // Count exported tabs (accounting for internal filter)
     const count = settings.includeInternalPages
       ? loaded.tabs.length
       : loaded.tabs.filter((t) => !isInternalPage(t.url)).length;
@@ -121,6 +130,14 @@ async function copyGroupToClipboard(
   }
 }
 
+/**
+ * Export All to Obsidian:
+ * Moves URI dispatch loop into the background service worker so it survives
+ * when Chrome closes the popup as Obsidian steals focus.
+ *
+ * Clipboard writes require user gesture context, so oversized groups are
+ * formatted and written to the clipboard from the popup before delegating.
+ */
 async function exportAllToObsidian(
   groups: LoadedGroup[],
   settings: TabVaultSettings
@@ -133,54 +150,51 @@ async function exportAllToObsidian(
   const exportAllBtn = getElement<HTMLButtonElement>("exportAllObsidianBtn");
   exportAllBtn.disabled = true;
 
-  let sentCount = 0;
-  const fallbackGroups: LoadedGroup[] = [];
-
   try {
-    for (let i = 0; i < groups.length; i++) {
-      const item = groups[i];
-      const name = item.group.title?.trim() || "Untitled group";
-      setStatus(`Exporting ${i + 1} of ${groups.length}: "${name}"...`, false, true);
+    const plan = planBatchExport(groups, settings);
 
-      const markdown = formatGroupMarkdown(item.group, item.tabs, {
-        listStyle: settings.listStyle,
-        includeInternalPages: settings.includeInternalPages,
+    // If any oversized groups need clipboard export, write them now
+    // while we still have active user gesture context in the popup.
+    if (plan.clipboardMarkdown) {
+      const ok = await copyToClipboard(plan.clipboardMarkdown);
+      if (!ok) {
+        setStatus("Failed to copy oversized groups to clipboard.", true);
+        return;
+      }
+    }
+
+    if (plan.directGroups.length > 0) {
+      setStatus(
+        `Exporting ${plan.directGroups.length} ${plan.directGroups.length === 1 ? "group" : "groups"} to Obsidian...`,
+        false,
+        true
+      );
+
+      // Delegate the URI dispatch loop to the background service worker
+      const response = await chrome.runtime.sendMessage({
+        type: "BATCH_EXPORT",
+        groups: plan.directGroups,
+        clipboardCount: plan.clipboardGroups.length,
+        settings,
       });
 
-      const handoff = prepareObsidianHandoff(item.group.title, markdown, settings);
-      if (handoff.success && handoff.type === "uri") {
-        await openObsidianUri(handoff.uri);
-        sentCount++;
-      } else if (handoff.success && handoff.type === "clipboard_fallback") {
-        fallbackGroups.push(item);
-      }
-
-      // Short delay between URIs to ensure sequential OS dispatch
-      if (i < groups.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 350));
+      if (response?.success && response.data) {
+        const summary = formatBatchResultSummary(response.data);
+        setStatus(summary, response.data.errors?.length > 0);
+        return;
+      } else if (!response?.success) {
+        setStatus(`Batch export error: ${response?.error || "Unknown error"}`, true);
+        return;
       }
     }
 
-    if (fallbackGroups.length > 0) {
-      const fallbackMarkdown = formatCombinedMarkdown(
-        fallbackGroups.map((g) => ({ group: g.group, tabs: g.tabs })),
-        {
-          listStyle: settings.listStyle,
-          includeInternalPages: settings.includeInternalPages,
-        }
-      );
-      await copyToClipboard(fallbackMarkdown);
-
-      const fallbackCount = fallbackGroups.length;
-      const fallbackMsg = `${fallbackCount} ${fallbackCount === 1 ? "was" : "were"} too long for Obsidian links, so ${fallbackCount === 1 ? "it was" : "they were"} copied to the clipboard.`;
-      const message = sentCount > 0
-        ? `Sent ${sentCount} to Obsidian. ${fallbackMsg}`
-        : fallbackMsg;
-
-      setStatus(message, false, true);
-    } else {
-      setStatus(`Successfully exported ${groups.length} ${groups.length === 1 ? "group" : "groups"} to Obsidian.`);
-    }
+    // If all groups were oversized and copied to clipboard
+    const summary = formatBatchResultSummary({
+      totalGroups: groups.length,
+      sentCount: 0,
+      clipboardCount: plan.clipboardGroups.length,
+    });
+    setStatus(summary, false, true);
   } catch (err) {
     setStatus(`Batch export error: ${String(err)}`, true);
   } finally {
@@ -303,6 +317,27 @@ function renderGroups(loadedGroups: LoadedGroup[], settings: TabVaultSettings): 
   };
 }
 
+/**
+ * Shows the result of the last batch export if it completed recently (within 60 seconds).
+ * Enables the user to see export results even when Obsidian stole focus and closed the popup.
+ */
+async function showLastExportResult(): Promise<void> {
+  try {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+    const data = await chrome.storage.local.get(LAST_EXPORT_STORAGE_KEY);
+    const result = data[LAST_EXPORT_STORAGE_KEY] as BatchExportResult | undefined;
+    if (!result) return;
+
+    const ageMs = Date.now() - result.timestamp;
+    if (ageMs > 60_000) return;
+
+    const summary = formatBatchResultSummary(result);
+    setStatus(`Last export: ${summary}`, (result.errors?.length || 0) > 0);
+  } catch {
+    // Non-critical
+  }
+}
+
 async function initPopup(): Promise<void> {
   const openOptionsBtn = getElement<HTMLButtonElement>("openOptionsBtn");
   openOptionsBtn.addEventListener("click", () => {
@@ -314,6 +349,9 @@ async function initPopup(): Promise<void> {
   });
 
   try {
+    // Show last export result if popup was reopened after a background export
+    await showLastExportResult();
+
     const settings = await getSettings();
     const rawGroups = await queryTabGroups(settings.allWindows);
 

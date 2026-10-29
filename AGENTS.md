@@ -19,7 +19,8 @@ Build a Chrome (Manifest V3) extension that exports a Chrome tab group as a Mark
 ```
 tabvault/
 ├── src/
-│   ├── background.ts     # service worker: installation defaults
+│   ├── background.ts     # service worker: installation defaults & background batch export
+│   ├── batch.ts          # PURE functions: batch export planning & result formatting (unit tested)
 │   ├── popup.ts          # popup UI: list groups, export buttons, status messages
 │   ├── popup.html
 │   ├── options.ts        # settings page (vault, folder, name template, list style, existing note)
@@ -76,7 +77,7 @@ Rules:
 ### Obsidian handoff (`obsidian.ts`)
 - URI form: `obsidian://new?vault=<vault>&file=<folder/name>&content=<encoded markdown>` with everything `encodeURIComponent`-encoded.
 - Note name comes from a template, default `{{group}}`. Supported tokens: `{{group}}`, `{{date}}`. Strip characters that are illegal in file names (`\ / : * ? " < > |`).
-- If the encoded URI is longer than about 8,000 characters (make it a constant), do not open it. Copy the Markdown to the clipboard and tell the user why.
+- If the encoded URI is longer than about 8,000 characters (make it a constant), switch to the clipboard flow: copy Markdown to the clipboard and open `obsidian://new?...&clipboard`. For batch export, oversized groups are copied together as combined Markdown to the clipboard.
 - Open the URI with `chrome.tabs.create({ url })` and close that tab afterwards, or use `chrome.tabs.update` on the current tab. Pick whichever works reliably and document the choice in a comment.
 - If no vault name is set, open the options page and show a message.
 
@@ -87,7 +88,7 @@ Rules:
 Defaults: `vault: ""`, `folder: ""`, `nameTemplate: "{{group}}"`, `listStyle: "checklist"`, `allWindows: true`, `includeInternalPages: false`, `existingNote: "unique"`. Store them in `chrome.storage.local`. Do not use `chrome.storage.sync`, because the author does not want cloud sync.
 
 ### Export all
-- A button that exports every group, one note each, one after another. Because opening many `obsidian://` URIs is flaky, add a short delay between them and a clear progress message. If that is unreliable, fall back to one combined Markdown copied to the clipboard with `## <group>` sections.
+- A button that exports every group, one note each, one after another. Handled in the background service worker so the export loop survives when the popup closes on focus loss. Sequential dispatch with a short delay between URIs, and results stored in `chrome.storage.local` to report to the user upon reopening.
 
 ## UI
 
