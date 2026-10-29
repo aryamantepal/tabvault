@@ -64,3 +64,12 @@ This script guides recording a crisp, 20-second demonstration GIF/video showing 
 - Screen Resolution: 1280×720 or 1440×900 (scaled for crisp GIF text).
 - Frame Rate: 30 fps or 60 fps.
 - Export as optimized `.gif` or `.mp4` into `assets/demo.gif`.
+
+---
+
+## Verified Behavior
+
+Checked manually in Chrome on macOS with the clipboard-first handoff (#15, #16, 2026-10-29):
+
+- **Obsidian** on a group creates the note.
+- Export All with 3 groups creates 3 notes (legacy inline links, 500 ms apart).
