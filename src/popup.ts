@@ -6,7 +6,7 @@ import {
   planBatchExport,
 } from "./batch";
 import { formatCombinedMarkdown, formatGroupMarkdown, isInternalPage } from "./markdown";
-import { openObsidianUri, prepareObsidianHandoff } from "./obsidian";
+import { prepareObsidianHandoff } from "./obsidian";
 import { getSettings } from "./settings";
 import { queryGroupTabs, queryTabGroups } from "./tabs";
 import { TabVaultSettings } from "./types";
@@ -51,6 +51,13 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+async function requestOpenObsidian(uri: string): Promise<void> {
+  const response = await chrome.runtime.sendMessage({ type: "OPEN_OBSIDIAN_URI", uri });
+  if (!response?.success) {
+    throw new Error(response?.error || "Could not open Obsidian");
+  }
+}
+
 async function exportGroupToObsidian(
   loaded: LoadedGroup,
   settings: TabVaultSettings
@@ -61,33 +68,35 @@ async function exportGroupToObsidian(
     existingNote: settings.existingNote,
   });
 
-  const handoff = prepareObsidianHandoff(
-    loaded.group.title,
-    markdown,
-    settings
-  );
+  const handoff = prepareObsidianHandoff(loaded.group.title, markdown, settings);
 
   if (!handoff.success) {
     setStatus(`Export failed: ${handoff.message}`, true);
     return;
   }
 
-  if (handoff.type === "clipboard_uri") {
-    // Large note: copy markdown to clipboard, then open obsidian://new with &clipboard
-    const ok = await copyToClipboard(handoff.markdown);
-    if (!ok) {
-      setStatus("Failed to copy note to clipboard for Obsidian.", true);
-      return;
-    }
-    await openObsidianUri(handoff.uri);
-    const groupName = loaded.group.title?.trim() || "Untitled group";
-    setStatus(`Sent "${groupName}" to Obsidian via clipboard.`);
+  const groupName = loaded.group.title?.trim() || "Untitled group";
+
+  if (handoff.type === "uri") {
+    await requestOpenObsidian(handoff.uri);
+    setStatus(`Opened "${groupName}" in Obsidian.`);
     return;
   }
 
-  await openObsidianUri(handoff.uri);
-  const groupName = loaded.group.title?.trim() || "Untitled group";
-  setStatus(`Sent "${groupName}" to Obsidian.`);
+  const copied = await copyToClipboard(handoff.markdown);
+  if (copied) {
+    await requestOpenObsidian(handoff.uri);
+    setStatus(`Opened "${groupName}" in Obsidian.`);
+    return;
+  }
+
+  if (handoff.fallbackUri) {
+    await requestOpenObsidian(handoff.fallbackUri);
+    setStatus(`Opened "${groupName}" in Obsidian. The clipboard was unavailable, so the note went in the link.`);
+    return;
+  }
+
+  setStatus("Couldn't copy the note to the clipboard, and it is too long to send in a link.", true);
 }
 
 async function copyGroupToClipboard(

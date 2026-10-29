@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   CLIPBOARD_FALLBACK_MESSAGE,
   MAX_OBSIDIAN_URI_LENGTH,
   buildObsidianUri,
   buildObsidianClipboardUri,
   formatAppendMarkdown,
+  openObsidianUri,
   prepareObsidianHandoff,
   resolveNoteName,
   sanitizeFileName,
@@ -466,5 +467,42 @@ describe("prepareObsidianHandoff legacy mode", () => {
       expect(result.uri).toContain("&silent=true");
       expect(new URL(result.uri).searchParams.get("content")).toBe("# Content");
     }
+  });
+});
+
+describe("openObsidianUri", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("navigates the active tab instead of creating and closing a tab", async () => {
+    const tabs = {
+      query: vi.fn().mockResolvedValue([{ id: 42 }]),
+      update: vi.fn().mockResolvedValue({ id: 42 }),
+      create: vi.fn(),
+      remove: vi.fn(),
+    };
+    vi.stubGlobal("chrome", { tabs });
+
+    await openObsidianUri("obsidian://new?file=A&clipboard");
+
+    expect(tabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
+    expect(tabs.update).toHaveBeenCalledWith(42, { url: "obsidian://new?file=A&clipboard" });
+    expect(tabs.create).not.toHaveBeenCalled();
+    expect(tabs.remove).not.toHaveBeenCalled();
+  });
+
+  it("falls back to creating a tab when there is no active tab", async () => {
+    const tabs = {
+      query: vi.fn().mockResolvedValue([]),
+      update: vi.fn(),
+      create: vi.fn().mockResolvedValue({ id: 7 }),
+    };
+    vi.stubGlobal("chrome", { tabs });
+
+    await openObsidianUri("obsidian://new?file=A");
+
+    expect(tabs.update).not.toHaveBeenCalled();
+    expect(tabs.create).toHaveBeenCalledWith({ url: "obsidian://new?file=A" });
   });
 });

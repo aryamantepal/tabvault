@@ -1,6 +1,10 @@
-import { BatchExportResult, LAST_EXPORT_STORAGE_KEY, LoadedGroup } from "./batch";
-import { formatGroupMarkdown } from "./markdown";
-import { buildObsidianUri, openObsidianUri, resolveNoteName, sanitizeFolderPath } from "./obsidian";
+import {
+  BatchExportResult,
+  LAST_EXPORT_STORAGE_KEY,
+  LoadedGroup,
+  prepareBatchGroupHandoff,
+} from "./batch";
+import { openObsidianUri } from "./obsidian";
 import { DEFAULT_SETTINGS, saveSettings } from "./settings";
 import { TabVaultSettings } from "./types";
 
@@ -16,6 +20,8 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onInstalled) {
   });
 }
 
+const BATCH_URI_DELAY_MS = 500;
+
 /**
  * Executes batch export in the background service worker.
  * Runs independently of popup lifetime (which closes when Obsidian steals focus).
@@ -28,28 +34,21 @@ export async function executeBatchExport(
   let sentCount = 0;
   const errors: string[] = [];
 
-  const vault = settings.vault?.trim();
-
   for (let i = 0; i < groups.length; i++) {
     const item = groups[i];
     try {
-      const markdown = formatGroupMarkdown(item.group, item.tabs, {
-        listStyle: settings.listStyle,
-        includeInternalPages: settings.includeInternalPages,
-        existingNote: settings.existingNote,
-      });
+      const handoff = prepareBatchGroupHandoff(item, settings);
+      if (!handoff.success || handoff.type !== "uri") {
+        throw new Error("note is too long to send in a link");
+      }
 
-      const noteName = resolveNoteName(settings.nameTemplate, item.group.title);
-      const folder = sanitizeFolderPath(settings.folder);
-      const filePath = folder ? `${folder}/${noteName}` : noteName;
-      const uri = buildObsidianUri(vault, filePath, markdown, settings.existingNote);
-
-      await openObsidianUri(uri);
+      await openObsidianUri(handoff.uri);
       sentCount++;
 
-      // Short delay between URIs to let the OS protocol handler process sequentially
+      // Each URI reuses the active tab, so give the previous handoff time to
+      // finish before navigating the tab again.
       if (i < groups.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 350));
+        await new Promise((resolve) => setTimeout(resolve, BATCH_URI_DELAY_MS));
       }
     } catch (err) {
       const name = item.group.title?.trim() || "Untitled group";
@@ -77,6 +76,14 @@ export async function executeBatchExport(
  */
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "OPEN_OBSIDIAN_URI") {
+      // Runs here rather than in the popup because the popup is destroyed as
+      // soon as Obsidian takes focus, which could cut the tab update short.
+      openObsidianUri(String(message.uri))
+        .then(() => sendResponse({ success: true }))
+        .catch((err) => sendResponse({ success: false, error: String(err) }));
+      return true;
+    }
     if (message?.type === "BATCH_EXPORT") {
       executeBatchExport(message.groups, message.settings, message.clipboardCount || 0)
         .then((result) => sendResponse({ success: true, data: result }))

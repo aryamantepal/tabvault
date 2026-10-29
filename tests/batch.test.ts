@@ -3,6 +3,7 @@ import {
   formatBatchResultSummary,
   LoadedGroup,
   planBatchExport,
+  prepareBatchGroupHandoff,
 } from "../src/batch";
 import { TabVaultSettings } from "../src/types";
 
@@ -71,6 +72,35 @@ describe("planBatchExport", () => {
   });
 });
 
+describe("prepareBatchGroupHandoff", () => {
+  const settings: TabVaultSettings = {
+    vault: "",
+    folder: "",
+    nameTemplate: "{{group}}",
+    listStyle: "checklist",
+    allWindows: true,
+    includeInternalPages: false,
+    existingNote: "unique",
+    legacyMode: false,
+    silent: true,
+  };
+  const item: LoadedGroup = {
+    group: { id: 1, title: "Reading", color: "blue", windowId: 1 },
+    tabs: [{ title: "A", url: "https://example.com/a" }],
+  };
+
+  it("uses inline content links even when legacyMode is off, and keeps silent", () => {
+    const handoff = prepareBatchGroupHandoff(item, settings, "2026-10-28");
+    expect(handoff.success && handoff.type).toBe("uri");
+    if (handoff.success && handoff.type === "uri") {
+      expect(handoff.uri).toContain("content=");
+      expect(handoff.uri).not.toContain("clipboard");
+      expect(handoff.uri).toContain("&silent=true");
+      expect(handoff.uri).not.toContain("vault=");
+    }
+  });
+});
+
 describe("formatBatchResultSummary", () => {
   it("formats summary when all groups exported successfully to Obsidian", () => {
     const summary = formatBatchResultSummary({
@@ -78,14 +108,14 @@ describe("formatBatchResultSummary", () => {
       sentCount: 3,
       clipboardCount: 0,
     });
-    expect(summary).toBe("Successfully exported 3 groups to Obsidian.");
+    expect(summary).toBe("Opened 3 groups in Obsidian.");
 
     const singleSummary = formatBatchResultSummary({
       totalGroups: 1,
       sentCount: 1,
       clipboardCount: 0,
     });
-    expect(singleSummary).toBe("Successfully exported 1 group to Obsidian.");
+    expect(singleSummary).toBe("Opened 1 group in Obsidian.");
   });
 
   it("formats summary when some groups were sent and some copied to clipboard", () => {
@@ -94,14 +124,14 @@ describe("formatBatchResultSummary", () => {
       sentCount: 2,
       clipboardCount: 1,
     });
-    expect(summary).toBe("Sent 2 to Obsidian. 1 was too long for Obsidian links, so it was copied to the clipboard.");
+    expect(summary).toBe("Opened 2 in Obsidian. 1 was too long for Obsidian links, so it was copied to the clipboard.");
 
     const pluralSummary = formatBatchResultSummary({
       totalGroups: 5,
       sentCount: 3,
       clipboardCount: 2,
     });
-    expect(pluralSummary).toBe("Sent 3 to Obsidian. 2 were too long for Obsidian links, so they were copied to the clipboard.");
+    expect(pluralSummary).toBe("Opened 3 in Obsidian. 2 were too long for Obsidian links, so they were copied to the clipboard.");
   });
 
   it("formats summary when all groups were copied to clipboard", () => {

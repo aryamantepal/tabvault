@@ -76,7 +76,7 @@ Before opening a pull request, run `npm test && npm run lint && npm run build` a
    - Open the TabVault popup and click **Obsidian** under "Export all groups".
    - Notice that Chrome closes the popup as Obsidian launches and takes OS window focus.
    - Allow ~1.5 seconds for the background service worker to dispatch all groups sequentially with 350ms delays.
-   - Reopen the popup: verify that the status bar shows `Last export: Successfully exported 3 groups to Obsidian.` and all 3 notes exist in your Obsidian vault.
+   - Reopen the popup: verify that the status bar shows `Last export: Opened 3 groups in Obsidian.` and all 3 notes exist in your Obsidian vault.
 8. **Theme & Responsiveness**:
    - Toggle system dark mode and light mode; verify popup and options render with appropriate contrast and visible focus outlines.
 
