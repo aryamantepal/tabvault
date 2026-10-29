@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  CLIPBOARD_FALLBACK_MESSAGE,
   MAX_OBSIDIAN_URI_LENGTH,
   buildObsidianUri,
   buildObsidianClipboardUri,
   formatAppendMarkdown,
+  openObsidianUri,
   prepareObsidianHandoff,
   resolveNoteName,
   sanitizeFileName,
@@ -112,16 +114,31 @@ describe("buildObsidianUri", () => {
     const uriUndefined = buildObsidianUri(undefined, "Folder/Note", "Content");
     expect(uriUndefined).not.toContain("vault=");
   });
+
+  it("adds silent=true only when silent is set", () => {
+    expect(buildObsidianUri("V", "Note", "Text", "unique", true)).toContain("&silent=true");
+    expect(buildObsidianUri("V", "Note", "Text", "unique", false)).not.toContain("silent=");
+    expect(buildObsidianUri("V", "Note", "Text")).not.toContain("silent=");
+  });
 });
 
 describe("buildObsidianClipboardUri", () => {
-  it("builds a URI with the clipboard flag and no content param", () => {
+  it("builds a URI ending in the bare clipboard flag with only the short fallback message as content", () => {
     const uri = buildObsidianClipboardUri("My Vault", "Folder/Note");
     expect(uri).toContain("obsidian://new?");
     expect(uri).toContain("vault=My%20Vault");
     expect(uri).toContain("file=Folder%2FNote");
-    expect(uri).toContain("&clipboard");
-    expect(uri).not.toContain("content=");
+    expect(uri.endsWith("&clipboard")).toBe(true);
+
+    const parsed = new URL(uri);
+    expect(parsed.searchParams.get("content")).toBe(CLIPBOARD_FALLBACK_MESSAGE);
+    expect(parsed.searchParams.has("clipboard")).toBe(true);
+  });
+
+  it("adds silent=true only when silent is set", () => {
+    expect(buildObsidianClipboardUri("V", "Note", "unique", true)).toContain("&silent=true");
+    expect(buildObsidianClipboardUri("V", "Note", "unique", false)).not.toContain("silent=");
+    expect(buildObsidianClipboardUri("V", "Note")).not.toContain("silent=");
   });
 
   it("includes overwrite param when configured", () => {
@@ -163,6 +180,8 @@ describe("prepareObsidianHandoff", () => {
     folder: "Clips",
     nameTemplate: "{{group}}",
     existingNote: "unique" as const,
+    legacyMode: true,
+    silent: false,
   };
 
   it("succeeds and omits vault parameter when vault is empty or whitespace", () => {
@@ -301,7 +320,7 @@ describe("prepareObsidianHandoff", () => {
     });
   });
 
-  it("returns clipboard_uri when URI exceeds MAX_OBSIDIAN_URI_LENGTH", () => {
+  it("legacy mode returns clipboard_uri without a fallback when the inline URI exceeds MAX_OBSIDIAN_URI_LENGTH", () => {
     expect(MAX_OBSIDIAN_URI_LENGTH).toBe(8000);
 
     // Generate markdown content > 8,000 characters
@@ -321,8 +340,9 @@ describe("prepareObsidianHandoff", () => {
       if (result.type === "clipboard_uri") {
         // The URI should use the clipboard flag, not embed content
         expect(result.uri).toContain("&clipboard");
-        expect(result.uri).not.toContain("content=");
+        expect(new URL(result.uri).searchParams.get("content")).toBe(CLIPBOARD_FALLBACK_MESSAGE);
         expect(result.uri.length).toBeLessThan(MAX_OBSIDIAN_URI_LENGTH);
+        expect(result.fallbackUri).toBeUndefined();
         expect(result.markdown).toBe(massiveContent);
       }
     }
@@ -343,5 +363,146 @@ describe("prepareObsidianHandoff", () => {
       expect(result.uri).toContain("&overwrite=true");
       expect(result.uri).toContain("&clipboard");
     }
+  });
+});
+
+describe("prepareObsidianHandoff clipboard mode (default)", () => {
+  const settings = {
+    vault: "Personal",
+    folder: "Clips",
+    nameTemplate: "{{group}}",
+    existingNote: "unique" as const,
+    legacyMode: false,
+    silent: false,
+  };
+
+  it("returns a short clipboard_uri with an inline fallbackUri for a small note", () => {
+    const result = prepareObsidianHandoff("Work", "# Content", settings, "2026-10-28");
+
+    expect(result.success).toBe(true);
+    if (result.success && result.type === "clipboard_uri") {
+      expect(result.uri).toContain("vault=Personal");
+      expect(result.uri).toContain("file=Clips%2FWork");
+      expect(result.uri.endsWith("&clipboard")).toBe(true);
+      expect(result.markdown).toBe("# Content");
+      expect(result.fallbackUri).toBeDefined();
+      expect(new URL(result.fallbackUri!).searchParams.get("content")).toBe("# Content");
+      expect(result.fallbackUri).not.toContain("clipboard");
+    } else {
+      throw new Error("expected clipboard_uri");
+    }
+  });
+
+  it("keeps using the clipboard URI for a note far over the inline limit, with no fallback", () => {
+    const massive = "# Large\n" + "- [ ] [Link](https://example.com/)\n".repeat(500);
+    const result = prepareObsidianHandoff("Big", massive, settings, "2026-10-28");
+
+    expect(result.success && result.type).toBe("clipboard_uri");
+    if (result.success && result.type === "clipboard_uri") {
+      expect(result.uri.length).toBeLessThan(MAX_OBSIDIAN_URI_LENGTH);
+      expect(result.fallbackUri).toBeUndefined();
+      expect(result.markdown).toBe(massive);
+    }
+  });
+
+  it("omits vault when blank in both the clipboard URI and the fallback", () => {
+    const result = prepareObsidianHandoff("Work", "x", { ...settings, vault: " " }, "2026-10-28");
+    if (result.success && result.type === "clipboard_uri") {
+      expect(result.uri).not.toContain("vault=");
+      expect(result.fallbackUri).not.toContain("vault=");
+    } else {
+      throw new Error("expected clipboard_uri");
+    }
+  });
+
+  it("passes silent, overwrite and append through to both URIs", () => {
+    const silent = prepareObsidianHandoff("W", "x", { ...settings, silent: true }, "2026-10-28");
+    const overwrite = prepareObsidianHandoff(
+      "W",
+      "x",
+      { ...settings, existingNote: "overwrite" },
+      "2026-10-28"
+    );
+    const append = prepareObsidianHandoff(
+      "W",
+      "---\ngroup: W\n---\n\n# W\n\n- a",
+      { ...settings, existingNote: "append" },
+      "2026-10-28"
+    );
+
+    if (
+      silent.success && silent.type === "clipboard_uri" &&
+      overwrite.success && overwrite.type === "clipboard_uri" &&
+      append.success && append.type === "clipboard_uri"
+    ) {
+      expect(silent.uri).toContain("&silent=true");
+      expect(silent.fallbackUri).toContain("&silent=true");
+      expect(overwrite.uri).toContain("&overwrite=true");
+      expect(overwrite.fallbackUri).toContain("&overwrite=true");
+      expect(append.uri).toContain("&append=true");
+      expect(append.markdown).toContain("## W (2026-10-28)");
+      expect(append.markdown).not.toContain("---");
+    } else {
+      throw new Error("expected clipboard_uri results");
+    }
+  });
+});
+
+describe("prepareObsidianHandoff legacy mode", () => {
+  const settings = {
+    vault: "",
+    folder: "",
+    nameTemplate: "{{group}}",
+    existingNote: "unique" as const,
+    legacyMode: true,
+    silent: true,
+  };
+
+  it("returns inline content without a clipboard flag, omitting blank vault, and honours silent", () => {
+    const result = prepareObsidianHandoff("Work", "# Content", settings, "2026-10-28");
+    expect(result.success && result.type).toBe("uri");
+    if (result.success && result.type === "uri") {
+      expect(result.uri).not.toContain("vault=");
+      expect(result.uri).not.toContain("clipboard");
+      expect(result.uri).toContain("&silent=true");
+      expect(new URL(result.uri).searchParams.get("content")).toBe("# Content");
+    }
+  });
+});
+
+describe("openObsidianUri", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("navigates the active tab instead of creating and closing a tab", async () => {
+    const tabs = {
+      query: vi.fn().mockResolvedValue([{ id: 42 }]),
+      update: vi.fn().mockResolvedValue({ id: 42 }),
+      create: vi.fn(),
+      remove: vi.fn(),
+    };
+    vi.stubGlobal("chrome", { tabs });
+
+    await openObsidianUri("obsidian://new?file=A&clipboard");
+
+    expect(tabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
+    expect(tabs.update).toHaveBeenCalledWith(42, { url: "obsidian://new?file=A&clipboard" });
+    expect(tabs.create).not.toHaveBeenCalled();
+    expect(tabs.remove).not.toHaveBeenCalled();
+  });
+
+  it("falls back to creating a tab when there is no active tab", async () => {
+    const tabs = {
+      query: vi.fn().mockResolvedValue([]),
+      update: vi.fn(),
+      create: vi.fn().mockResolvedValue({ id: 7 }),
+    };
+    vi.stubGlobal("chrome", { tabs });
+
+    await openObsidianUri("obsidian://new?file=A");
+
+    expect(tabs.update).not.toHaveBeenCalled();
+    expect(tabs.create).toHaveBeenCalledWith({ url: "obsidian://new?file=A" });
   });
 });

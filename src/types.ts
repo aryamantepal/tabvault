@@ -26,6 +26,8 @@ export interface TabVaultSettings {
   allWindows: boolean;
   includeInternalPages: boolean;
   existingNote: ExistingNoteAction;
+  legacyMode: boolean;
+  silent: boolean;
 }
 
 export interface MarkdownFormatOptions {
@@ -47,6 +49,7 @@ export type ObsidianHandoffResult =
       success: true;
       type: "clipboard_uri";
       uri: string;
+      fallbackUri?: string;
       noteName: string;
       markdown: string;
     }

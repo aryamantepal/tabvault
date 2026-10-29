@@ -31,7 +31,7 @@ This script guides recording a crisp, 20-second demonstration GIF/video showing 
 ### Shot 2: Export Group to Obsidian (0:04 – 0:08)
 - **Visual**: In the popup list, mouse hovers over the **Job Search** card.
 - **Action**: Click the purple **Obsidian** button on **Job Search**.
-- **Result**: The popup shows `Sent "Job Search" to Obsidian.`. Obsidian launches to the foreground.
+- **Result**: The popup shows `Opened "Job Search" in Obsidian.`. Obsidian launches to the foreground.
 - **On-Screen Caption**: *One click opens your vault.*
 
 ### Shot 3: Verified Note in Obsidian (0:08 – 0:12)

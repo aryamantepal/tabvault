@@ -279,6 +279,22 @@
         </div>
       </div>
 
+      <div class="checkbox-group">
+        <input type="checkbox" id="silent">
+        <div>
+          <label for="silent" class="checkbox-label">Don't bring Obsidian to the front</label>
+          <div class="help-text">Adds <code>silent=true</code> so the note is created without switching to Obsidian.</div>
+        </div>
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="legacyMode">
+        <div>
+          <label for="legacyMode" class="checkbox-label">Legacy mode: put note content in the link</label>
+          <div class="help-text">By default the note is copied to your clipboard and Obsidian reads it from there. Legacy mode leaves your clipboard alone, but long notes still fall back to the clipboard.</div>
+        </div>
+      </div>
+
       <div class="actions">
         <button type="button" id="resetBtn" class="btn-secondary">Reset to Defaults</button>
         <button type="submit" class="btn-primary">Save Settings</button>
