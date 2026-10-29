@@ -18,9 +18,12 @@ Chrome has no built-in way to copy all the links in a tab group. If you keep rea
   - Each tab is a checklist item: `- [ ] [Page title](https://url)`
 - Two outputs:
   1. **Send to Obsidian** via an `obsidian://new` link (into a vault and folder you choose, or your last-opened vault if blank)
-  2. **Copy to clipboard** (also the automatic fallback when the note is too long for a URL)
-- Safe protocol handling for long notes: When an exported note exceeds safe operating system protocol URI limits (~8,000 characters, safeguarding against Windows protocol handler limits), TabVault uses Obsidian's `clipboard` parameter (`obsidian://new?...&clipboard`) by copying the note to your clipboard and triggering Obsidian to import from it. When using **Export All to Obsidian**, any oversized groups are copied together as a combined Markdown note to your clipboard.
-- Settings: vault name (optional, defaults to your last-opened vault), folder, note-name template, checklist vs. plain list, behavior if the note already exists in Obsidian (create a new unique note, overwrite, or append), search across all windows, and include/exclude internal browser pages
+  2. **Copy to clipboard**
+- Clipboard handoff by default: **Obsidian** copies the note to your clipboard and opens `obsidian://new?...&clipboard`, so note length never hits operating system link limits. The link also carries a short message that Obsidian shows only if it can't read the clipboard. If the clipboard write fails, TabVault puts the note in the link instead (up to ~8,000 characters).
+- Legacy mode (Settings): puts the note content in the link and leaves your clipboard alone. Notes over ~8,000 characters still use the clipboard, since longer links are unreliable on some operating systems.
+- **Export All to Obsidian** always uses content-in-the-link, one note per group, one after another. It runs in the extension's background worker so it keeps going when Chrome closes the popup as Obsidian takes focus, and that worker can't write the clipboard. Groups too long for a link are copied together as one combined Markdown note instead.
+- Links are opened in your current tab, which stays on its page. Chrome may ask once whether to allow opening Obsidian.
+- Settings: vault name (optional, defaults to your last-opened vault), folder, note-name template, checklist vs. plain list, behavior if the note already exists in Obsidian (create a new unique note, overwrite, or append), search across all windows, include/exclude internal browser pages, legacy mode, and "Don't bring Obsidian to the front" (`silent=true`)
 - Optional "Export all groups" that produces one note per group (or copies all to clipboard)
 
 ## Not in scope for v0.1
@@ -29,6 +32,7 @@ Restoring groups, syncing, duplicate detection, Firefox support. These are good 
 
 ## Limitations
 
+- **"Opened in Obsidian" means Chrome handed the link off.** TabVault can't see whether Obsidian created the note.
 - **Saved tab groups must be open:** Chrome's extension API only returns tab groups that are currently open in a window. Saved groups that are closed into the bookmarks bar do not appear in TabVault. Click a group in your bookmarks bar to open it before exporting.
 
 ## Example output
@@ -70,7 +74,7 @@ Then open `chrome://extensions`, enable Developer mode, click **Load unpacked**,
 
 ## Privacy
 
-- Permissions requested: `tabs`, `tabGroups`, and `storage` (for your settings, stored locally). No `clipboardWrite` permission is needed since clipboard copying runs with user gesture activation directly from the popup.
+- Permissions requested: `tabs`, `tabGroups`, and `storage` (for your settings, stored locally). No `clipboardWrite` permission is needed since clipboard copying runs with user gesture activation directly from the popup. Your clipboard is overwritten with the note when you click **Obsidian** (unless legacy mode is on).
 - No network requests. No analytics. No remote code.
 - Tab titles and URLs are read only when you click Obsidian or Copy.
 

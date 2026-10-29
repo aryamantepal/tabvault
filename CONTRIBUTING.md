@@ -66,8 +66,10 @@ Before opening a pull request, run `npm test && npm run lint && npm run build` a
    - In Settings, clear the Obsidian vault name and save.
    - In the popup, click **Obsidian**.
    - Verify TabVault alerts you and redirects directly to Settings.
-5. **Safe Protocol Length & Clipboard URI Flow**:
-   - Verify that very large groups (exceeding 8,000 characters) copy to the clipboard and trigger an `obsidian://new?...&clipboard` URI or combined clipboard copy, with an informative status message.
+5. **Clipboard Handoff, Legacy Mode & Silent**:
+   - Click **Obsidian** on a small group: the note is created, the clipboard holds the note's Markdown, and the status reads `Opened "<group>" in Obsidian.` only after the handoff (no hidden tab flashes open).
+   - In Settings, enable **Legacy mode** and export again: the note is created and the clipboard is untouched. A group over ~8,000 encoded characters still goes through the clipboard.
+   - Enable **Don't bring Obsidian to the front** and export: the note is created without Obsidian taking focus.
 6. **Append Mode**:
    - In Settings, set "If the note exists" to **Append**.
    - Export a group to Obsidian twice. Confirm that the second export appends only a `## <group> (<date>)` heading and the link list, without duplicating YAML front matter or `# Title`.
@@ -75,8 +77,8 @@ Before opening a pull request, run `npm test && npm run lint && npm run build` a
    - Create 3 distinct tab groups in Chrome (e.g., *Job Search*, *Reading List*, *Papers*).
    - Open the TabVault popup and click **Obsidian** under "Export all groups".
    - Notice that Chrome closes the popup as Obsidian launches and takes OS window focus.
-   - Allow ~1.5 seconds for the background service worker to dispatch all groups sequentially with 350ms delays.
-   - Reopen the popup: verify that the status bar shows `Last export: Opened 3 groups in Obsidian.` and all 3 notes exist in your Obsidian vault.
+   - Allow ~1.5 seconds for the background service worker to dispatch all groups sequentially with 500ms delays.
+   - Reopen the popup: verify that the status bar shows `Last export: Opened 3 groups in Obsidian.` and all 3 notes exist in your Obsidian vault. Export All uses content-in-the-link, so this works with Legacy mode off.
 8. **Theme & Responsiveness**:
    - Toggle system dark mode and light mode; verify popup and options render with appropriate contrast and visible focus outlines.
 
