@@ -79,7 +79,7 @@ Rules:
 - Note name comes from a template, default `{{group}}`. Supported tokens: `{{group}}`, `{{date}}`. Strip characters that are illegal in file names (`\ / : * ? " < > |`).
 - If the encoded URI is longer than about 8,000 characters (make it a constant), switch to the clipboard flow: copy Markdown to the clipboard and open `obsidian://new?...&clipboard`. For batch export, oversized groups are copied together as combined Markdown to the clipboard.
 - Open the URI with `chrome.tabs.create({ url })` and close that tab afterwards, or use `chrome.tabs.update` on the current tab. Pick whichever works reliably and document the choice in a comment.
-- If no vault name is set, open the options page and show a message.
+- The vault name is optional; if omitted, Obsidian targets the currently active or last-opened vault.
 
 ### Clipboard
 - Use `navigator.clipboard.writeText` from the popup (user gesture). Show "Copied N links" feedback.

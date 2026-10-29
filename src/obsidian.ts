@@ -75,16 +75,20 @@ export function sanitizeFolderPath(folder: string): string {
  * encoded as "%20" rather than "+", which Obsidian may display literally.
  */
 export function buildObsidianUri(
-  vault: string,
+  vault: string | undefined,
   filePath: string,
   content: string,
   existingNote?: ExistingNoteAction
 ): string {
-  const params: [string, string][] = [
-    ["vault", vault],
-    ["file", filePath],
-    ["content", content],
-  ];
+  const params: [string, string][] = [];
+
+  const trimmedVault = vault?.trim();
+  if (trimmedVault) {
+    params.push(["vault", trimmedVault]);
+  }
+
+  params.push(["file", filePath]);
+  params.push(["content", content]);
 
   if (existingNote === "overwrite") {
     params.push(["overwrite", "true"]);
@@ -106,14 +110,18 @@ export function buildObsidianUri(
  * See https://help.obsidian.md/Extending+Obsidian/Obsidian+URI
  */
 export function buildObsidianClipboardUri(
-  vault: string,
+  vault: string | undefined,
   filePath: string,
   existingNote?: ExistingNoteAction
 ): string {
-  const params: [string, string][] = [
-    ["vault", vault],
-    ["file", filePath],
-  ];
+  const params: [string, string][] = [];
+
+  const trimmedVault = vault?.trim();
+  if (trimmedVault) {
+    params.push(["vault", trimmedVault]);
+  }
+
+  params.push(["file", filePath]);
 
   if (existingNote === "overwrite") {
     params.push(["overwrite", "true"]);
@@ -174,13 +182,6 @@ export function prepareObsidianHandoff(
   date: string = getDefaultDateString()
 ): ObsidianHandoffResult {
   const vault = settings.vault?.trim();
-  if (!vault) {
-    return {
-      success: false,
-      error: "no_vault",
-      message: "Please configure your Obsidian vault name in TabVault settings.",
-    };
-  }
 
   const noteName = resolveNoteName(settings.nameTemplate, groupTitle, date);
   const folder = sanitizeFolderPath(settings.folder);

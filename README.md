@@ -17,15 +17,19 @@ Chrome has no built-in way to copy all the links in a tab group. If you keep rea
   - Title is the group name
   - Each tab is a checklist item: `- [ ] [Page title](https://url)`
 - Two outputs:
-  1. **Send to Obsidian** via an `obsidian://new` link, into a vault and folder you choose
+  1. **Send to Obsidian** via an `obsidian://new` link (into a vault and folder you choose, or your last-opened vault if blank)
   2. **Copy to clipboard** (also the automatic fallback when the note is too long for a URL)
 - Safe protocol handling for long notes: When an exported note exceeds safe operating system protocol URI limits (~8,000 characters, safeguarding against Windows protocol handler limits), TabVault uses Obsidian's `clipboard` parameter (`obsidian://new?...&clipboard`) by copying the note to your clipboard and triggering Obsidian to import from it. When using **Export All to Obsidian**, any oversized groups are copied together as a combined Markdown note to your clipboard.
-- Settings: vault name, folder, note-name template, checklist vs. plain list, behavior if the note already exists in Obsidian (create a new unique note, overwrite, or append), search across all windows, and include/exclude internal browser pages
+- Settings: vault name (optional, defaults to your last-opened vault), folder, note-name template, checklist vs. plain list, behavior if the note already exists in Obsidian (create a new unique note, overwrite, or append), search across all windows, and include/exclude internal browser pages
 - Optional "Export all groups" that produces one note per group (or copies all to clipboard)
 
 ## Not in scope for v0.1
 
 Restoring groups, syncing, duplicate detection, Firefox support. These are good first issues for contributors later.
+
+## Limitations
+
+- **Saved tab groups must be open:** Chrome's extension API only returns tab groups that are currently open in a window. Saved groups that are closed into the bookmarks bar do not appear in TabVault. Click a group in your bookmarks bar to open it before exporting.
 
 ## Example output
 
@@ -59,8 +63,10 @@ Then open `chrome://extensions`, enable Developer mode, click **Load unpacked**,
 ## Usage
 
 1. Click the TabVault icon.
-2. Set your Obsidian vault name once in Settings.
+2. (Optional) Set your Obsidian vault name in Settings (leave blank to default to your last-opened vault).
 3. Click **Obsidian** or **Copy** next to a tab group (or use **Export All to Obsidian** / **Copy All to Clipboard** at the bottom).
+
+> **Note:** Saved groups that are closed don't show up here. Click a group in your bookmarks bar to open it, then export.
 
 ## Privacy
 

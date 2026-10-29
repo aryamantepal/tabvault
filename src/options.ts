@@ -38,14 +38,6 @@ async function initOptions(): Promise<void> {
   const settings = await getSettings();
   populateForm(settings);
 
-  // Check URL parameters for direct navigation feedback (e.g. from popup missing vault)
-  const urlParams = new URLSearchParams(window.location.search);
-  const msgParam = urlParams.get("message");
-  if (msgParam === "no_vault") {
-    showStatus("Please set your Obsidian vault name before exporting to Obsidian.", true);
-    getElement<HTMLInputElement>("vault").focus();
-  }
-
   const form = getElement<HTMLFormElement>("settingsForm");
   form.addEventListener("submit", async (e) => {
     e.preventDefault();

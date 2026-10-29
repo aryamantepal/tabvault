@@ -29,19 +29,6 @@ export async function executeBatchExport(
   const errors: string[] = [];
 
   const vault = settings.vault?.trim();
-  if (!vault) {
-    const errorResult: BatchExportResult = {
-      timestamp: Date.now(),
-      totalGroups: groups.length + clipboardCount,
-      sentCount: 0,
-      clipboardCount,
-      errors: ["No vault configured in settings"],
-    };
-    if (typeof chrome !== "undefined" && chrome.storage?.local) {
-      await chrome.storage.local.set({ [LAST_EXPORT_STORAGE_KEY]: errorResult });
-    }
-    return errorResult;
-  }
 
   for (let i = 0; i < groups.length; i++) {
     const item = groups[i];

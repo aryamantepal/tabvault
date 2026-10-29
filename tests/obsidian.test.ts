@@ -99,6 +99,19 @@ describe("buildObsidianUri", () => {
     expect(uriUnique).not.toContain("overwrite=");
     expect(uriUnique).not.toContain("append=");
   });
+
+  it("omits vault parameter when vault is empty or undefined", () => {
+    const uriEmpty = buildObsidianUri("", "Folder/Note", "Content");
+    expect(uriEmpty).not.toContain("vault=");
+    expect(uriEmpty).toContain("file=Folder%2FNote");
+    expect(uriEmpty).toContain("content=Content");
+
+    const uriWhitespace = buildObsidianUri("   ", "Folder/Note", "Content");
+    expect(uriWhitespace).not.toContain("vault=");
+
+    const uriUndefined = buildObsidianUri(undefined, "Folder/Note", "Content");
+    expect(uriUndefined).not.toContain("vault=");
+  });
 });
 
 describe("buildObsidianClipboardUri", () => {
@@ -129,6 +142,19 @@ describe("buildObsidianClipboardUri", () => {
     expect(uri).not.toContain("append=");
     expect(uri).toContain("&clipboard");
   });
+
+  it("omits vault parameter when vault is empty or undefined", () => {
+    const uriEmpty = buildObsidianClipboardUri("", "Folder/Note");
+    expect(uriEmpty).not.toContain("vault=");
+    expect(uriEmpty).toContain("file=Folder%2FNote");
+    expect(uriEmpty).toContain("&clipboard");
+
+    const uriWhitespace = buildObsidianClipboardUri("   ", "Folder/Note");
+    expect(uriWhitespace).not.toContain("vault=");
+
+    const uriUndefined = buildObsidianClipboardUri(undefined, "Folder/Note");
+    expect(uriUndefined).not.toContain("vault=");
+  });
 });
 
 describe("prepareObsidianHandoff", () => {
@@ -139,7 +165,7 @@ describe("prepareObsidianHandoff", () => {
     existingNote: "unique" as const,
   };
 
-  it("returns error if vault is empty", () => {
+  it("succeeds and omits vault parameter when vault is empty or whitespace", () => {
     const result = prepareObsidianHandoff(
       "Work",
       "# Content",
@@ -147,9 +173,10 @@ describe("prepareObsidianHandoff", () => {
       "2026-10-28"
     );
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe("no_vault");
+    expect(result.success).toBe(true);
+    if (result.success && result.type === "uri") {
+      expect(result.uri).not.toContain("vault=");
+      expect(result.uri).toContain("file=Clips%2FWork");
     }
   });
 

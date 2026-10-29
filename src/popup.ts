@@ -51,26 +51,10 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function redirectToOptionsForVault(): void {
-  setStatus("Obsidian vault name is not set. Opening settings...", true, true);
-  setTimeout(() => {
-    if (chrome.runtime.openOptionsPage) {
-      chrome.runtime.openOptionsPage();
-    } else {
-      window.open(chrome.runtime.getURL("options.html?message=no_vault"));
-    }
-  }, 400);
-}
-
 async function exportGroupToObsidian(
   loaded: LoadedGroup,
   settings: TabVaultSettings
 ): Promise<void> {
-  if (!settings.vault.trim()) {
-    redirectToOptionsForVault();
-    return;
-  }
-
   const markdown = formatGroupMarkdown(loaded.group, loaded.tabs, {
     listStyle: settings.listStyle,
     includeInternalPages: settings.includeInternalPages,
@@ -84,11 +68,7 @@ async function exportGroupToObsidian(
   );
 
   if (!handoff.success) {
-    if (handoff.error === "no_vault") {
-      redirectToOptionsForVault();
-    } else {
-      setStatus(`Export failed: ${handoff.message}`, true);
-    }
+    setStatus(`Export failed: ${handoff.message}`, true);
     return;
   }
 
@@ -142,11 +122,6 @@ async function exportAllToObsidian(
   groups: LoadedGroup[],
   settings: TabVaultSettings
 ): Promise<void> {
-  if (!settings.vault.trim()) {
-    redirectToOptionsForVault();
-    return;
-  }
-
   const exportAllBtn = getElement<HTMLButtonElement>("exportAllObsidianBtn");
   exportAllBtn.disabled = true;
 
@@ -226,12 +201,14 @@ function renderGroups(loadedGroups: LoadedGroup[], settings: TabVaultSettings): 
   const listEl = getElement<HTMLUListElement>("groupsList");
   const emptyEl = getElement<HTMLDivElement>("emptyState");
   const batchContainer = getElement<HTMLDivElement>("batchContainer");
+  const footerEl = getElement<HTMLElement>("popupFooter");
 
   listEl.innerHTML = "";
 
   if (loadedGroups.length === 0) {
     listEl.style.display = "none";
     batchContainer.style.display = "none";
+    footerEl.style.display = "none";
     emptyEl.style.display = "flex";
     return;
   }
@@ -239,6 +216,7 @@ function renderGroups(loadedGroups: LoadedGroup[], settings: TabVaultSettings): 
   emptyEl.style.display = "none";
   listEl.style.display = "flex";
   batchContainer.style.display = "flex";
+  footerEl.style.display = "block";
 
   for (const loaded of loadedGroups) {
     const li = document.createElement("li");
