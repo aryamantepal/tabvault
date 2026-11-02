@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - "v*"
+  # Manual run for testing the store upload. With "publish" off, the zip is
+  # uploaded as a draft and nothing is submitted for review.
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Submit for review after uploading"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -12,6 +20,10 @@ jobs:
   release:
     name: Build & Publish Release
     runs-on: ubuntu-latest
+    env:
+      # `secrets` can't be read in `if:`, so expose it here and test `env`
+      # instead. Forks and repos without the secret skip the store step.
+      EXTENSION_ID: ${{ secrets.EXTENSION_ID }}
 
     steps:
       - name: Checkout repository
@@ -22,6 +34,20 @@ jobs:
         with:
           node-version: 22
           cache: "npm"
+
+      - name: Check versions match
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          manifest=$(node -p "require('./public/manifest.json').version")
+          if [ "$pkg" != "$manifest" ]; then
+            echo "::error::package.json ($pkg) and manifest.json ($manifest) versions differ"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$pkg" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version v$pkg"
+            exit 1
+          fi
+          echo "VERSION=$pkg" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: npm ci
@@ -36,9 +62,24 @@ jobs:
         run: npm run package
 
       - name: Create GitHub Release
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           files: tabvault-*.zip
           draft: false
           prerelease: false
           generate_release_notes: true
+
+      - name: Upload to Chrome Web Store
+        if: env.EXTENSION_ID != ''
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+          PUBLISHER_ID: ${{ secrets.PUBLISHER_ID }}
+          PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+        # With no command the CLI uploads and submits for review;
+        # `upload` alone leaves a draft in the dashboard.
+        run: |
+          if [ "$PUBLISH" = "true" ]; then cmd=""; else cmd="upload"; fi
+          npx --yes chrome-webstore-upload-cli@4.0.2 $cmd --source "tabvault-v${VERSION}.zip"

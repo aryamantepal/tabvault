@@ -84,6 +84,33 @@ Before opening a pull request, run `npm test && npm run lint && npm run build` a
 
 ---
 
+## Releasing
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds and tests the extension, attaches `tabvault-v<version>.zip` to a GitHub Release, and uploads the same zip to the Chrome Web Store and submits it for review.
+
+1. Bump `version` in both `package.json` and `public/manifest.json`. The workflow fails if they differ or don't match the tag.
+2. Commit, then tag and push:
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+3. Wait for the store review. Don't push another tag while a submission is still pending, because the store rejects uploads during review.
+
+To test the store upload without submitting, run the **Release** workflow by hand from the Actions tab with **publish** off. The zip is uploaded as a draft.
+
+### First-time store setup
+
+1. Upload the first version by hand in the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole) to create the item.
+2. Create OAuth credentials (client ID, client secret, refresh token) by following the [chrome-webstore-upload-keys guide](https://github.com/fregante/chrome-webstore-upload-keys). Publish the OAuth consent screen to production, or the refresh token expires after 7 days.
+3. Add these repository secrets (`gh secret set <NAME>`):
+   - `EXTENSION_ID`: the item ID from the dashboard.
+   - `PUBLISHER_ID`: the ID after `devconsole/` in the dashboard URL.
+   - `CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`: from step 2.
+
+Without `EXTENSION_ID`, as in a fork, the workflow skips the store step.
+
+---
+
 ## Pull Request Guidelines
 
 1. Every pull request should reference a corresponding GitHub issue (`Fixes #<issue-number>`).
